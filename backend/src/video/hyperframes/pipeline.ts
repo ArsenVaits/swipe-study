@@ -62,7 +62,7 @@ export async function runPipeline(jobId: string, lesson: Lesson, workDir: string
   await cb.stage("writing");
   let html = await writeWithOpus(workDir, lesson, voice, audio, cb);
   const usedFallback = html === null;
-  if (html === null) html = fallbackComposition(lesson, voice);
+  if (html === null) html = fallbackComposition(lesson, voice, config.HYPERFRAMES_CAPTIONS);
   await writeFile(path.join(workDir, "index.html"), html);
 
   await cb.stage("rendering");
@@ -70,7 +70,7 @@ export async function runPipeline(jobId: string, lesson: Lesson, workDir: string
   let rendered = await renderSlots.use(() => render(workDir, rawMp4));
   if (!rendered && !usedFallback) {
     console.warn(`[hyperframes] ${jobId}: Opus composition failed to render, using the fallback template`);
-    await writeFile(path.join(workDir, "index.html"), fallbackComposition(lesson, voice));
+    await writeFile(path.join(workDir, "index.html"), fallbackComposition(lesson, voice, config.HYPERFRAMES_CAPTIONS));
     rendered = await renderSlots.use(() => render(workDir, rawMp4));
   }
   if (!rendered) throw new PipelineError("The video could not be rendered.");

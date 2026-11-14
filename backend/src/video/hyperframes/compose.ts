@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { config } from "../../config.ts";
 import type { Lesson } from "../../lessons/schema.ts";
 import type { Voiceover } from "../../tts/index.ts";
-import { COMPOSE_SYSTEM_PROMPT } from "./prompt.ts";
+import { composeSystemPrompt } from "./prompt.ts";
 import { extractHtml } from "./sanitize.ts";
 
 // API key is read by the SDK from ANTHROPIC_API_KEY (server env only).
@@ -47,7 +47,7 @@ export class CompositionWriter {
         .stream({
           model: config.HYPERFRAMES_MODEL,
           max_tokens: 32000,
-          system: [{ type: "text", text: COMPOSE_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+          system: [{ type: "text", text: composeSystemPrompt(config.HYPERFRAMES_CAPTIONS), cache_control: { type: "ephemeral" } }],
           messages: this.messages,
           output_config: { effort: config.HYPERFRAMES_EFFORT },
           betas: ["server-side-fallback-2026-07-01"],
@@ -81,7 +81,7 @@ function briefFor(lesson: Lesson, voice: Voiceover, audio: AudioAssets): string 
     title: lesson.title,
     hook: lesson.hook,
     explanation: lesson.explanation,
-    captions: lesson.captions,
+    keyPoints: lesson.captions,
     sourceQuote: lesson.sourceQuote,
   };
   const lines = voice.lines.map((l, i) => `${i + 1}. [${l.start.toFixed(2)}-${l.end.toFixed(2)} s] ${l.text}`).join("\n");
@@ -97,7 +97,7 @@ function briefFor(lesson: Lesson, voice: Voiceover, audio: AudioAssets): string 
     "</voice_lines>",
     "",
     `DURATION: ${voice.duration} (the root's data-duration, in seconds)`,
-    `Voice file: ${voice.file ? `assets/${voice.file}` : "none — silent video; the captions still follow the voice lines' timings"}`,
+    `Voice file: ${voice.file ? `assets/${voice.file}` : "none (silent video; still time the scenes to the voice lines)"}`,
     `Music: ${audio.music ?? "none"}`,
     `Sound effects: ${audio.sfx.length ? audio.sfx.join(", ") : "none"}`,
     "",
