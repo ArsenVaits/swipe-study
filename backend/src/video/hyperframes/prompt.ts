@@ -5,7 +5,9 @@
 export const WIDTH = 1080;
 export const HEIGHT = 1920;
 
-export const COMPOSE_SYSTEM_PROMPT = `You are a motion designer who writes HyperFrames compositions: HTML + CSS + inline SVG animated with one GSAP timeline, rendered frame by frame to a vertical 1080x1920 MP4 for a TikTok-style learning feed. Each video explains one idea from a micro-lesson in about 20-60 seconds, like the best animated "what is X" explainer reels: clear animated diagrams, schemes, charts and kinetic type, never bullet slides.
+/** The system prompt; `captions` switches burned-in subtitles of the narration on or off. */
+export function composeSystemPrompt(captions: boolean): string {
+  return `You are a motion designer who writes HyperFrames compositions: HTML + CSS + inline SVG animated with one GSAP timeline, rendered frame by frame to a vertical 1080x1920 MP4 for a TikTok-style learning feed. Each video explains one idea from a micro-lesson in about 20-60 seconds, like the best animated "what is X" explainer reels: clear animated diagrams, schemes, charts and kinetic type, never bullet slides.
 
 # Output
 Reply with exactly one complete HTML document, starting with <!doctype html> and ending with </html>. No markdown fences, no commentary.
@@ -27,8 +29,8 @@ Reply with exactly one complete HTML document, starting with <!doctype html> and
 <div id="root" data-composition-id="main" data-start="0" data-duration="DURATION" data-width="1080" data-height="1920">
   <div id="bg" style="position:absolute; inset:0"></div>          <!-- untimed full-bleed background -->
   <div id="s1" class="scene clip" data-start="0" data-duration="...">...</div>   <!-- one div per scene -->
-  <div id="cap1" class="cap clip" data-start="..." data-duration="..."><span>...</span></div>   <!-- captions -->
-  <audio id="voice" class="clip" src="assets/voice.wav" data-start="0" data-duration="DURATION" data-volume="1"></audio>   <!-- only if a voice file is given -->
+${captions ? `  <div id="cap1" class="cap clip" data-start="..." data-duration="..."><span>...</span></div>   <!-- captions -->
+` : ""}  <audio id="voice" class="clip" src="assets/voice.wav" data-start="0" data-duration="DURATION" data-volume="1"></audio>   <!-- only if a voice file is given -->
 </div>
 <script>
   const tl = gsap.timeline({ paused: true });
@@ -68,12 +70,21 @@ Reply with exactly one complete HTML document, starting with <!doctype html> and
 - Transitions between scenes (3-5 kinds, each with a cause on screen): an object grows past the frame and becomes the next scene; colour flood under a staying object; whip smear 0.2 s with blur; blur swap (out: opacity 0 + 8px blur in 0.15 s, in: blur->0 in 0.13 s); iris with clip-path: circle(). At most a third hard cuts.
 - Rhythm: a new beat every 2-4 s; a line the viewer must read holds 0.5 s + 0.3 s per word; the last line holds at least 2 s.
 
-# Voice and captions
+# Voice${captions ? " and captions" : ""}
 - The voice is the clock: the voice lines below come with exact start and end times. Each scene starts on the line it illustrates; a label or part appears when its line names it.
-- Burned-in captions follow the voice lines: groups of 3-5 words, one group visible at a time, each group a .clip with its own data-start/data-duration inside its line's time window (split a line's time across its groups by character count). First caption starts at its line's start, never at 0.
+${captions ? CAPTION_RULES : NO_CAPTION_RULES}${SOUND_RULES}`;
+}
+
+const CAPTION_RULES = `- Burned-in captions follow the voice lines: groups of 3-5 words, one group visible at a time, each group a .clip with its own data-start/data-duration inside its line's time window (split a line's time across its groups by character count). First caption starts at its line's start, never at 0.
 - Captions sit in a full-width absolute container near the bottom of the safe band (bottom edge at about y=1300), centred with text-align, 52-64 px bold, high contrast with a subtle text shadow or a scrim sized to the text, never a full-width bar. Never left:50% + translateX(-50%).
 - Do not repeat the caption text as big titles at the same time; titles name the idea, captions carry the words.
+`;
 
+const NO_CAPTION_RULES = `- No subtitles or captions of the spoken words: the app shows its own. On-screen text is titles, labels, numbers and key words only: short, never the narration written out line by line.
+- Keep the bottom of the safe band (y=1150 to 1330) free of text; the app may draw its captions there.
+`;
+
+const SOUND_RULES = `
 # Sound
 - If a voice file is given, include it exactly as in the skeleton (data-volume="1").
 - If a music file is given: one <audio id="music"> spanning the whole video at data-volume="0.14" with data-fade-out="1.5".

@@ -22,7 +22,11 @@ function fontSizeFor(text: string): number {
   return 50;
 }
 
-export function fallbackComposition(lesson: Lesson, voice: Voiceover): string {
+/**
+ * `captions` true: every voice line is spelled out as it is spoken.
+ * false: only the lesson's short key points, one per beat (the app shows subtitles itself).
+ */
+export function fallbackComposition(lesson: Lesson, voice: Voiceover, captions: boolean): string {
   const D = voice.duration;
   const lines = voice.lines;
   const firstEnd = lines[0]?.end ?? 3;
@@ -42,15 +46,29 @@ export function fallbackComposition(lesson: Lesson, voice: Voiceover): string {
     `tl.to("#s0 > *", {opacity: 0, filter: "blur(8px)", duration: 0.15, ease: "power3.in"}, ${(titleEnd - 0.16).toFixed(2)});`,
   );
 
-  // One scene per voice line after the first: the spoken words land as they are said.
-  lines.slice(1).forEach((line, i) => {
+  // Beats after the title: voice lines (captions on) or key points pinned to voice-line starts (off).
+  const beats: Array<{ text: string; start: number; spokenEnd: number }> = [];
+  if (captions) {
+    for (const l of lines.slice(1)) beats.push({ text: l.text, start: l.start, spokenEnd: l.end });
+  } else {
+    const points = lesson.captions;
+    points.forEach((text, k) => {
+      const idx = lines.length > 1 ? 1 + Math.floor((k * (lines.length - 1)) / points.length) : -1;
+      const start = idx > 0 ? lines[idx]!.start : titleEnd + ((D - titleEnd) * k) / points.length;
+      if (beats.length && start <= beats[beats.length - 1]!.start) return;
+      beats.push({ text, start, spokenEnd: start + 1.2 });
+    });
+  }
+
+  beats.forEach((beat, i) => {
     const n = i + 1;
-    const start = line.start;
-    const end = n + 1 < lines.length ? lines[n + 1]!.start : D;
+    const start = beat.start;
+    const end = i + 1 < beats.length ? beats[i + 1]!.start : D;
     const dur = Math.max(0.5, end - start);
     const id = `s${n}`;
+    const line = beat;
     const wordCount = line.text.split(/\s+/).filter(Boolean).length;
-    const spoken = Math.max(0.4, line.end - line.start);
+    const spoken = Math.max(0.4, beat.spokenEnd - beat.start);
     const stagger = Math.min(0.12, (spoken * 0.8) / Math.max(1, wordCount));
     scenes.push(`
   <div id="${id}" class="scene clip" data-start="${start.toFixed(2)}" data-duration="${dur.toFixed(2)}">
@@ -61,7 +79,7 @@ export function fallbackComposition(lesson: Lesson, voice: Voiceover): string {
       `tl.fromTo("#${id}-num", {opacity: 0, x: -40}, {opacity: 1, x: 0, duration: 0.5, ease: "expo.out"}, ${start.toFixed(2)});`,
       `tl.fromTo("#${id}-line .w", {opacity: 0.18}, {opacity: 1, duration: 0.12, stagger: ${stagger.toFixed(3)}, ease: "power2.out"}, ${(start + 0.05).toFixed(2)});`,
     );
-    if (n + 1 < lines.length) {
+    if (i + 1 < beats.length) {
       tweens.push(`tl.to("#${id} > *", {opacity: 0, filter: "blur(8px)", duration: 0.15, ease: "power3.in"}, ${(end - 0.16).toFixed(2)});`);
     }
   });

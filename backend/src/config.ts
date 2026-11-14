@@ -33,6 +33,11 @@ const EnvSchema = z.object({
   HYPERFRAMES_MAX_PARALLEL_RENDERS: intFromEnv(1),
   HYPERFRAMES_RENDER_TIMEOUT_MS: intFromEnv(10 * 60 * 1000),
   // 0..2 rounds where Opus fixes what `hyperframes check` found.
+  // Burned-in subtitles of the narration. Off: the frontend shows captions itself.
+  HYPERFRAMES_CAPTIONS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   HYPERFRAMES_FIX_ROUNDS: z.coerce.number().int().min(0).max(2).default(1),
   HYPERFRAMES_KEEP_WORK_DIRS: z
     .enum(["true", "false"])

@@ -84,7 +84,8 @@ Server-side refusal fallback is on (`fallbacks: "default"`): if Opus declines, t
 
 ## HyperFrames videos (`VIDEO_PROVIDER=hyperframes`)
 
-Animated explainer reels (diagrams, charts, kinetic type, burned-in captions, optional voice) built with
+Animated explainer reels (diagrams, charts, kinetic type, optional voice; burned-in subtitles only with
+`HYPERFRAMES_CAPTIONS=true`, off by default because the frontend draws captions) built with
 [HyperFrames](https://github.com/heygen-com/hyperframes) (Apache-2.0): HTML + CSS + SVG + GSAP rendered frame by
 frame in headless Chrome, encoded with FFmpeg.
 
