@@ -9,3 +9,9 @@ next-env.d.ts
 
 .vercel
 !.env.example
+
+# backend
+backend/data/
+*.db
+*.db-*
+.DS_Store
