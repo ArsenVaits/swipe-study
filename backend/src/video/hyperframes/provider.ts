@@ -43,10 +43,21 @@ export class HyperframesVideoProvider implements VideoProvider {
 
     this.running.add(id);
     const lesson = input.lesson;
-    void runPipeline(id, lesson, workDir, { stage: (stage) => this.writeStatus(id, { stage, updatedAt: Date.now() }) })
-      .then(async () => {
-        await this.writeStatus(id, { stage: "ready", updatedAt: Date.now() });
-        if (!config.HYPERFRAMES_KEEP_WORK_DIRS) await rm(workDir, { recursive: true, force: true });
+    const t0 = Date.now();
+    let last = t0;
+    let lastStage = "queued";
+    const stage = async (next: Stage) => {
+      const now = Date.now();
+      console.log(`[hyperframes] ${id} ${lastStage} ${((now - last) / 1000).toFixed(1)}s -> ${next} (total ${((now - t0) / 1000).toFixed(1)}s)`);
+      last = now;
+      lastStage = next;
+      await this.writeStatus(id, { stage: next, updatedAt: now });
+    };
+    void runPipeline(id, lesson, workDir, { stage })
+      .then(async ({ usedFallback }) => {
+        await stage("ready");
+        // A fallback render keeps its work dir (Opus's HTML, check/render logs) for debugging.
+        if (!config.HYPERFRAMES_KEEP_WORK_DIRS && !usedFallback) await rm(workDir, { recursive: true, force: true });
       })
       .catch(async (err) => {
         const message = err instanceof PipelineError ? err.message : "Video rendering failed.";

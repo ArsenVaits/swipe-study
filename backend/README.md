@@ -106,8 +106,9 @@ Pipeline per lesson (runs in the background after `POST` returns; `GET` reports 
    stripped, a strict CSP (no network) is injected and GSAP is loaded from a local copy. Render subprocesses get
    no server secrets and HyperFrames telemetry is off.
 4. **Check** (`hyperframes check --json`): lint, runtime JS errors, layout/safe zones, contrast. Findings go back to
-   Opus for `HYPERFRAMES_FIX_ROUNDS` fix rounds. Code that still breaks (lint/runtime errors) → built-in fallback
-   template (`fallback.ts`, kinetic type from the lesson), so a lesson still gets a video.
+   Opus for `HYPERFRAMES_FIX_ROUNDS` fix rounds (default 2). JS errors that survive them, or a failed render → built-in
+   fallback template (`fallback.ts`, key points from the lesson), so a lesson still gets a video; Opus's HTML is
+   then kept as `opus-rejected.html` in the work dir. Leftover lint errors alone don't block the render.
 5. **Render** (`hyperframes render`, at most `HYPERFRAMES_MAX_PARALLEL_RENDERS` at once) → FFmpeg loudness pass
    (−14 LUFS, −1.5 dBTP, video stream copied) → ffprobe check (H.264, 1080×1920, expected length).
 6. MP4 lands in `<db dir>/videos/<id>.mp4` (next to `DATABASE_PATH`, so it survives deploys), served at
