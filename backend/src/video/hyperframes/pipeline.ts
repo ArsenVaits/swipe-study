@@ -23,8 +23,10 @@ const GSAP_FILE = path.join(BACKEND_DIR, "node_modules", "gsap", "dist", "gsap.m
 const CHECK_TIMEOUT_MS = 2 * 60_000;
 const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg)$/i;
 
-// Report sections whose errors mean the composition itself is broken (bad markup, JS errors).
-const BLOCKING_SECTIONS = new Set(["lint", "runtime"]);
+// Errors that mean the composition itself is broken (JS errors at runtime). Lint errors left after
+// the fix rounds are usually cosmetic (one element shown late), so we still render Opus's version;
+// if that render fails, the fallback template takes over.
+const BLOCKING_SECTIONS = new Set(["runtime"]);
 // Findings about Studio editability, not about the picture: not worth a fix round.
 const IGNORED_FINDINGS = new Set(["nested_structure_needs_subcomposition", "audio_none", "missing_track_kind"]);
 
@@ -50,7 +52,12 @@ class Semaphore {
 const renderSlots = new Semaphore(config.HYPERFRAMES_MAX_PARALLEL_RENDERS);
 
 /** Runs the whole job and returns the path of the finished MP4 in VIDEO_OUTPUT_DIR. */
-export async function runPipeline(jobId: string, lesson: Lesson, workDir: string, cb: PipelineCallbacks): Promise<string> {
+export async function runPipeline(
+  jobId: string,
+  lesson: Lesson,
+  workDir: string,
+  cb: PipelineCallbacks,
+): Promise<{ file: string; usedFallback: boolean }> {
   const assetsDir = path.join(workDir, "assets");
   await mkdir(assetsDir, { recursive: true });
   await copyFile(GSAP_FILE, path.join(assetsDir, "gsap.min.js"));
@@ -68,7 +75,10 @@ export async function runPipeline(jobId: string, lesson: Lesson, workDir: string
   await cb.stage("rendering");
   const rawMp4 = path.join(workDir, "render.mp4");
   let rendered = await renderSlots.use(() => render(workDir, rawMp4));
+  let fellBack = usedFallback;
   if (!rendered && !usedFallback) {
+    fellBack = true;
+    await copyFile(path.join(workDir, "index.html"), path.join(workDir, "opus-rejected.html"));
     console.warn(`[hyperframes] ${jobId}: Opus composition failed to render, using the fallback template`);
     await writeFile(path.join(workDir, "index.html"), fallbackComposition(lesson, voice, config.HYPERFRAMES_CAPTIONS));
     rendered = await renderSlots.use(() => render(workDir, rawMp4));
@@ -85,8 +95,8 @@ export async function runPipeline(jobId: string, lesson: Lesson, workDir: string
   await mkdir(outDir, { recursive: true });
   const outFile = path.join(outDir, `${jobId}.mp4`);
   await rename(finalMp4, outFile);
-  console.log(`[hyperframes] ${jobId}: ready (${usedFallback ? "fallback template" : "Opus composition"}, voice: ${voice.file ? "yes" : "no"})`);
-  return outFile;
+  console.log(`[hyperframes] ${jobId}: ready (${fellBack ? "fallback template" : "Opus composition"}, voice: ${voice.file ? "yes" : "no"})`);
+  return { file: outFile, usedFallback: fellBack };
 }
 
 /** Opus draft → `hyperframes check` → up to N fix rounds. Returns null when no clean composition came out. */
@@ -109,8 +119,14 @@ async function writeWithOpus(
       if (problems.length === 0 || round >= config.HYPERFRAMES_FIX_ROUNDS) {
         // Quality findings (contrast, layout) that survived the fixes are accepted;
         // code that breaks the render (lint/runtime errors) sends us to the fallback template.
-        if (blocking > 0) console.warn("[hyperframes] composition still breaks after fixes:", problems.filter((p) => p.startsWith("[error]")).slice(0, 5));
-        return blocking === 0 ? html : null;
+        if (blocking > 0) {
+          console.warn("[hyperframes] composition still breaks after fixes:", problems.filter((p) => p.startsWith("[error]")).slice(0, 5));
+          await writeFile(path.join(workDir, "opus-rejected.html"), html); // kept for debugging
+          return null;
+        }
+        const left = problems.filter((p) => p.startsWith("[error]"));
+        if (left.length) console.warn(`[hyperframes] rendering Opus composition with ${left.length} non-blocking error(s):`, left.slice(0, 3));
+        return html;
       }
       await cb.stage("writing");
       html = clean(await writer.fix(problems));
