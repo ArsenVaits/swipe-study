@@ -401,7 +401,6 @@ export default function Studio() {
 
   return (
     <div className='site-shell'>
-      <h1>TESTETSTETSTEES</h1>
       <a className='skip-link' href='#lesson-feed'>
         Skip to lesson feed
       </a>
