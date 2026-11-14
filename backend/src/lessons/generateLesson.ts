@@ -70,6 +70,7 @@ export async function generateLesson(input: GenerateLessonInput): Promise<Lesson
   // Small manual tool loop: normally 2 requests (tool call, then final JSON). Hard cap avoids runaway cost.
   for (let turn = 0; turn < 3; turn++) {
     const response = await callOpus(messages, useTools);
+    logUsage("lesson", response);
 
     if (response.stop_reason === "refusal") {
       throw new ApiError(422, "LESSON_REFUSED", "The AI declined to create a lesson from this text.");
@@ -93,6 +94,15 @@ export async function generateLesson(input: GenerateLessonInput): Promise<Lesson
     return parseLesson(response, input);
   }
   throw new ApiError(502, "LESSON_GENERATION_FAILED", "The AI did not finish the lesson. Please try again.");
+}
+
+/** Token usage per Opus call, for cost tracking (no content is logged). */
+export function logUsage(kind: string, response: Anthropic.Beta.BetaMessage): void {
+  const u = response.usage;
+  console.log(
+    `[opus:usage] ${kind} model=${response.model} stop=${response.stop_reason} in=${u.input_tokens} out=${u.output_tokens}` +
+      ` cache_write=${u.cache_creation_input_tokens ?? 0} cache_read=${u.cache_read_input_tokens ?? 0}`,
+  );
 }
 
 async function callOpus(messages: Anthropic.Beta.BetaMessageParam[], useTools: boolean) {

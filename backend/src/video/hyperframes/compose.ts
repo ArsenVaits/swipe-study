@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { config } from "../../config.ts";
+import { logUsage } from "../../lessons/generateLesson.ts";
 import type { Lesson } from "../../lessons/schema.ts";
 import type { Voiceover } from "../../tts/index.ts";
 import { composeSystemPrompt } from "./prompt.ts";
@@ -60,6 +61,7 @@ export class CompositionWriter {
       throw new ComposeError("Opus request failed");
     }
 
+    logUsage(this.messages.length > 1 ? "compose-fix" : "compose", response);
     if (response.stop_reason === "refusal") throw new ComposeError("Opus declined to write the composition");
     if (response.stop_reason === "max_tokens") throw new ComposeError("Composition was cut off (max_tokens)");
 
