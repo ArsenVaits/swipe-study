@@ -86,7 +86,7 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 .feed-footer > span { display: flex; align-items: center; gap: 6px; }
 .feed-indicator { width: 7px; height: 7px; border-radius: 50%; background: var(--purple); }
 
-.video-frame { height: 100%; width: 100%; position: relative; isolation: isolate; background: #281751; color: white; overflow: hidden; }
+.video-frame { height: 100%; width: 100%; position: relative; isolation: isolate; container-type: inline-size; background: #281751; color: white; overflow: hidden; }
 .video-frame video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .video-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, #140a33 0%, #170b36e8 11%, #160c36b8 23%, transparent 54%); }
 .sample-label { position: absolute; top: 16px; left: 16px; display: flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid #ffffff42; border-radius: 6px; background: #1c104bc9; color: #fff; font-size: 11px; font-weight: 780; letter-spacing: .02em; }
@@ -101,9 +101,11 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 .video-controls input::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; }
 .video-controls input::-moz-range-thumb { width: 11px; height: 11px; border: 0; border-radius: 50%; background: #fff; }
 .control-row { display: flex; gap: 8px; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
-.control-row button { display: grid; color: white; place-items: center; min-width: 33px; min-height: 36px; border-radius: 6px; }
+.control-row button { display: grid; color: white; place-items: center; min-width: 33px; min-height: 36px; border-radius: 6px; flex-shrink: 0; }
 .control-row button:hover, .control-row button[aria-pressed=true] { background: #ffffff21; }
-.control-row button:last-child:not(:first-child) { margin-inline-start: auto; }
+.control-row > span { margin-inline-end: auto; white-space: nowrap; }
+.control-row button:disabled { opacity: .65; }
+.download-error { position: absolute; bottom: 100px; left: 6%; right: 6%; margin: 0; padding: 10px; border-radius: 6px; background: #281751; color: white; font-size: 13px; }
 .video-error { position: absolute; top: 42%; margin: 0 12%; padding: 8px; background: #281751; text-align: center; }
 .recap-state { display: grid; place-content: center; justify-items: center; gap: 13px; height: 100%; padding: 25px; text-align: center; color: #efe7ff; background: #261749; }
 .recap-state strong { font-family: var(--display); font-size: 21px; }
@@ -114,6 +116,7 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 .lesson-info { padding: clamp(17px, 1.8vw, 25px) clamp(16px, 1.7vw, 24px) 15px; }
 .lesson-kicker { color: var(--purple-dark); display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; margin-bottom: 11px; }
 .lesson-info h2 { font-size: clamp(23px, 2.15vw, 34px); letter-spacing: -.035em; line-height: 1.08; margin: 0; font-weight: 850; }
+.lesson-info h2, .quiz legend, .video-cover-title, .recap-state strong { overflow-wrap: anywhere; }
 .lesson-info p { white-space: pre-line; color: var(--muted); line-height: 1.57; font-size: 14px; margin: 13px 0 8px; overflow-wrap: anywhere; }
 .read-aloud { min-height: 34px; }
 .detail-tabs { display: flex; gap: 20px; padding: 0 clamp(16px, 1.7vw, 24px); border-bottom: 1px solid var(--line); }
@@ -173,13 +176,18 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 .saved-list li { display: flex; align-items: center; gap: 14px; padding: 14px 0; }
 .saved-list li + li { border-top: 1px solid var(--line); }
 .saved-list li > svg { color: var(--purple); flex-shrink: 0; }
-.saved-link { text-align: left; display: grid; gap: 3px; flex: 1; min-width: 0; }
+.saved-link { text-align: left; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .saved-link span { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .empty-library { background: white; padding: 35px 20px; border: 1px solid var(--line); border-radius: 16px; text-align: center; }
 .empty-library > svg { color: var(--purple); margin: 0 auto 12px; }
 .empty-library h2 { font-size: 22px; font-weight: 800; }
 .spin { animation: spin 900ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@container (max-width: 270px) {
+  .control-row { gap: 4px; }
+  .control-row button { min-width: 30px; }
+}
 
 @media (max-width: 1110px) {
   :root { --feed-height: clamp(470px, calc(100dvh - 175px), 605px); }
