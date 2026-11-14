@@ -11,25 +11,13 @@
 
 ## 1. Быстрый старт для фронта
 
-### Подключение через Vite proxy (рекомендуется)
+### Через proxy Next.js (так уже настроено в `frontend/`)
 
-Тогда не нужен CORS, а относительный `videoUrl` вида `/demo/lesson.mp4` работает как есть.
-
-```ts
-// vite.config.ts
-export default defineConfig({
-  server: {
-    proxy: {
-      "/api": "http://localhost:3001",
-      "/demo": "http://localhost:3001",
-    },
-  },
-});
-```
+`frontend/next.config.ts` проксирует `/api/*` и `/demo/*` на бэкенд (`SCROLLED_API_ORIGIN`, по умолчанию `http://127.0.0.1:3001`). CORS не нужен, а относительный `videoUrl` вида `/demo/lesson.mp4` работает как есть.
 
 ### Без proxy
 
-Ходите напрямую на `http://localhost:3001`. CORS разрешён для `http://localhost:5173` (на бэкенде настраивается `CORS_ORIGIN`, можно несколько через запятую). Относительный `videoUrl` в этом случае нужно префиксовать адресом бэкенда (см. раздел 6).
+Ходите напрямую на `http://localhost:3001`. CORS разрешён для `http://localhost:3000` (на бэкенде настраивается `CORS_ORIGIN`, можно несколько через запятую). Относительный `videoUrl` в этом случае нужно префиксовать адресом бэкенда (см. раздел 6).
 
 ---
 
@@ -222,7 +210,7 @@ export interface ApiErrorBody {
 - `videoUrl` бывает двух видов:
   - относительный (`/demo/lesson.mp4`) — mock-провайдер отдаёт заранее подготовленный ролик с бэкенда;
   - абсолютный `https://...` — реальный ролик от LTX.
-- Если ходите без Vite proxy, нормализуйте:
+- Если ходите без proxy Next.js, нормализуйте:
   ```ts
   const API_ORIGIN = "http://localhost:3001";
   const toAbsolute = (url: string) => (url.startsWith("/") ? API_ORIGIN + url : url);
@@ -325,7 +313,7 @@ export function getSessionId(): string {
 // api.ts
 import type { ApiErrorBody, CreateLessonJobRequest, LessonJob } from "./types";
 
-const API_BASE = ""; // с Vite proxy; без proxy — "http://localhost:3001"
+const API_BASE = ""; // с proxy Next.js; без proxy — "http://localhost:3001"
 
 export class ApiError extends Error {
   status: number;
@@ -451,7 +439,7 @@ curl -s localhost:3001/api/lesson-jobs/<jobId>
 
 ## 12. Чек-лист фронта
 
-- [ ] Vite proxy для `/api` и `/demo` (или префикс для относительного `videoUrl`)
+- [ ] proxy `/api` и `/demo` в Next.js (уже есть в `frontend/next.config.ts`) или префикс для относительного `videoUrl`
 - [ ] `sessionId` генерируется один раз и хранится в `localStorage`
 - [ ] Проверка длины выделения до отправки: 80–12 000 символов
 - [ ] Лоадер на время `POST` (10–40 с), таймаут запроса ≥ 120 с, кнопка не даёт отправить дважды

@@ -1,17 +1,4 @@
-.next/
 node_modules/
-out/
-public/pdf/
 .env*
-.vercel/
-*.tsbuildinfo
-next-env.d.ts
-
-.vercel
 !.env.example
-
-# backend
-backend/data/
-*.db
-*.db-*
 .DS_Store

@@ -1,0 +1,6 @@
+.next/
+out/
+public/pdf/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
