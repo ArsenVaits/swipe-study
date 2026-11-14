@@ -12,7 +12,7 @@
   --soft-purple: #eee8fc;
   --display: "Manrope Variable", sans-serif;
   --body: "DM Sans Variable", sans-serif;
-  --feed-height: clamp(516px, calc(100dvh - 188px), 716px);
+  --feed-height: clamp(540px, calc(100dvh - 150px), 880px);
 }
 
 * { box-sizing: border-box; }
@@ -64,12 +64,11 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 .feed-count span { color: var(--muted); padding: 0 2px; }
 .feed-layout { display: grid; grid-template-columns: max-content 42px; gap: 12px; align-items: end; }
 .shorts {
-  height: var(--feed-height);
-  width: calc(var(--feed-height) * .5625);
+  width: min(calc(var(--feed-height) * .5625), calc(min(100vw - 80px, 1270px) - 514px - 2 * clamp(24px, 3.7vw, 58px)));
+  aspect-ratio: 9 / 16;
   position: relative;
   overflow: hidden auto;
   overflow-anchor: none;
-  overscroll-behavior-y: contain;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
   border-radius: 19px;
@@ -190,20 +189,22 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 }
 
 @media (max-width: 1110px) {
-  :root { --feed-height: clamp(470px, calc(100dvh - 175px), 605px); }
+  :root { --feed-height: clamp(490px, calc(100dvh - 150px), 740px); }
   .studio { width: calc(100% - 48px); grid-template-columns: minmax(195px, 1fr) max-content minmax(205px, 1fr); gap: 22px; }
   .feed-layout { gap: 8px; grid-template-columns: max-content 40px; }
+  .shorts { width: min(calc(var(--feed-height) * .5625), calc(100vw - 540px)); }
 }
 @media (max-width: 895px) {
-  :root { --feed-height: clamp(455px, 63dvh, 610px); }
+  :root { --feed-height: clamp(480px, calc(100dvh - 150px), 695px); }
   .studio { max-width: 680px; grid-template-columns: minmax(0, 1fr) max-content; }
+  .shorts { width: min(calc(var(--feed-height) * .5625), calc(min(100vw - 48px, 680px) - 290px)); }
   .upload-panel { grid-column: 1; grid-row: 1; }
   .feed-section { grid-column: 2; grid-row: 1 / span 2; }
   .detail-panel { grid-column: 1; margin-top: 0; }
   .upload-panel { padding-top: 35px; }
 }
 @media (max-width: 640px) {
-  :root { --feed-height: min(610px, max(420px, 67dvh), calc((100vw - 72px) * 1.7778)); }
+  :root { --feed-height: calc(100dvh - 106px); }
   .header-inner { height: 58px; width: calc(100% - 26px); gap: 7px; }
   .wordmark { font-size: 19px; gap: 5px; }
   .brand-mark { width: 27px; height: 27px; border-radius: 7px; }
@@ -223,7 +224,7 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
   .hero-description { margin: 10px 0 15px; max-width: 45ch; }
   .dropzone, .sample-row { max-width: 100%; }
   .feed-layout { grid-template-columns: minmax(0, 1fr) 40px; }
-  .shorts { height: auto; width: min(100%, calc(var(--feed-height) * .5625)); aspect-ratio: 9 / 16; justify-self: center; }
+  .shorts { height: auto; width: min(100%, max(220px, calc(var(--feed-height) * .5625))); aspect-ratio: 9 / 16; justify-self: center; }
   .header-inner nav button, .header-action { white-space: nowrap; }
   .header-inner nav button svg { display: none; }
   .feed-heading h2 { font-size: 17px; }

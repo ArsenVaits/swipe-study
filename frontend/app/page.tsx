@@ -41,7 +41,7 @@ import {
   X
 } from 'lucide-react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Player from './player'
 
 type Source = {
@@ -85,6 +85,8 @@ const sampleMedia = [
   { video: '/sample/practice.mp4', poster: '/sample/practice.webp' }
 ]
 const archive = 'scrolled-library-v1'
+const wheelGestureGap = 180
+const wheelThreshold = 30
 
 export default function Studio() {
   const [source, setSource] = useState<Source | null>(null)
@@ -102,7 +104,9 @@ export default function Studio() {
   const input = useRef<HTMLInputElement>(null)
   const uploadPanel = useRef<HTMLElement>(null)
   const detailPanel = useRef<HTMLElement>(null)
+  const studio = useRef<HTMLElement>(null)
   const feed = useRef<HTMLDivElement>(null)
+  const wheelGesture = useRef({ lastEvent: -Infinity, distance: 0, consumed: false })
   const requestedShort = useRef<{ id: string; smooth: boolean } | null>(null)
   const currentPdf = useRef<Source | null>(null)
   const clipUrls = useRef<string[]>([])
@@ -148,11 +152,59 @@ export default function Studio() {
       requestedShort.current = null
   })
 
-  function goTo(id: string, smooth = true) {
+  const goTo = useCallback((id: string, smooth = true) => {
     if (id !== active || !feed.current) requestedShort.current = { id, smooth }
     setActive(id)
     setPanel('quiz')
-  }
+  }, [active])
+
+  useEffect(() => {
+    const workspace = studio.current
+    if (!workspace) return
+
+    function scrollFeed(event: WheelEvent) {
+      if (event.defaultPrevented || !event.cancelable || event.ctrlKey || event.shiftKey) return
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+      if (!(event.target instanceof Element)) return
+
+      const scroller = feed.current
+      if (!scroller) return
+      for (let element: Element | null = event.target; element && element !== workspace; element = element.parentElement) {
+        if (element.matches('input, textarea, select, [contenteditable]')) return
+        if (element !== scroller && element.scrollHeight > element.clientHeight &&
+            /auto|scroll/.test(getComputedStyle(element).overflowY)) return
+      }
+      const bounds = scroller.getBoundingClientRect()
+      if (event.clientY < bounds.top - 44 || event.clientY > bounds.bottom + 36) return
+
+      const gesture = wheelGesture.current
+      if (event.timeStamp - gesture.lastEvent > wheelGestureGap) {
+        gesture.distance = 0
+        gesture.consumed = false
+      }
+      gesture.lastEvent = event.timeStamp
+      if (gesture.consumed) {
+        event.preventDefault()
+        return
+      }
+
+      const direction = Math.sign(event.deltaY)
+      const next = entries[index + direction]
+      if (!next) return
+
+      event.preventDefault()
+      const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? scroller.clientHeight : 1
+      if (Math.sign(gesture.distance) !== direction) gesture.distance = 0
+      gesture.distance += event.deltaY * scale
+      if (Math.abs(gesture.distance) < wheelThreshold) return
+
+      gesture.consumed = true
+      goTo(next.id)
+    }
+
+    workspace.addEventListener('wheel', scrollFeed, { passive: false })
+    return () => workspace.removeEventListener('wheel', scrollFeed)
+  }, [tab, entries, index, goTo])
 
   function onFeedScroll() {
     const scroller = feed.current
@@ -484,7 +536,7 @@ export default function Studio() {
           )}
         </main>
       ) : (
-        <main className='studio'>
+        <main className='studio' ref={studio}>
           <section className='upload-panel' ref={uploadPanel} aria-labelledby='upload-title'>
             {source ? (
               <>
@@ -605,9 +657,6 @@ export default function Studio() {
                 tabIndex={0}
                 aria-label='Vertical lesson videos'
                 onScroll={onFeedScroll}
-                onWheel={() => {
-                  requestedShort.current = null
-                }}
                 onTouchStart={() => {
                   requestedShort.current = null
                 }}
