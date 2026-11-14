@@ -50,13 +50,18 @@ const EnvSchema = z.object({
   FFPROBE_PATH: z.string().default("ffprobe"),
 
   // Voiceover for HyperFrames videos.
-  TTS_PROVIDER: z.enum(["none", "openai", "elevenlabs"]).default("none"),
+  TTS_PROVIDER: z.enum(["none", "openai", "elevenlabs", "piper"]).default("none"),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_TTS_MODEL: z.string().default("gpt-4o-mini-tts"),
   OPENAI_TTS_VOICE: z.string().default("coral"),
   ELEVENLABS_API_KEY: z.string().optional(),
   ELEVENLABS_VOICE_ID: z.string().optional(),
   ELEVENLABS_MODEL: z.string().default("eleven_multilingual_v2"),
+  // Piper: free local TTS (github.com/OHF-Voice/piper1-gpl), run as a separate CLI process.
+  PIPER_BIN: z.string().default("piper"),
+  PIPER_MODEL: z.string().optional(),
+  // < 1 speaks faster, > 1 slower.
+  PIPER_LENGTH_SCALE: z.coerce.number().min(0.5).max(2).default(0.95),
 
   MAX_SOURCE_CHARS: intFromEnv(12000),
   MAX_LESSON_JOBS_PER_SESSION: intFromEnv(20),

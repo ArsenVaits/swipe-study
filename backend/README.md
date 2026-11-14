@@ -91,7 +91,9 @@ frame in headless Chrome, encoded with FFmpeg.
 
 Setup: `brew install ffmpeg` (or `apt install ffmpeg`), Chrome (system Chrome works, or `npx hyperframes browser`),
 then `npx hyperframes doctor`. Optional voice: `TTS_PROVIDER=openai` + `OPENAI_API_KEY`, or `elevenlabs` +
-`ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID`. Optional music/SFX: drop files into `assets/audio/` (see its README).
+`ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID`, or free local `piper` (`pip install piper-tts==1.8.0` in a venv,
+a voice from huggingface.co/rhasspy/piper-voices, e.g. CC0 `ru_RU-dmitri-medium`; set `PIPER_BIN` and
+`PIPER_MODEL`). If the composition forgets the voice clip, the pipeline adds it. Optional music/SFX: drop files into `assets/audio/` (see its README).
 
 Pipeline per lesson (runs in the background after `POST` returns; `GET` reports `rendering_video` until done):
 

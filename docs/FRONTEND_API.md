@@ -123,7 +123,7 @@ GET /api/lesson-jobs/:jobId  каждые 3–5 с
 { "ok": true, "videoProvider": "mock", "lessonAi": "configured", "tts": "none" }
 ```
 
-`videoProvider`: `"mock"` | `"ltx"` | `"hyperframes"`. `tts`: `"none"` | `"openai"` | `"elevenlabs"` (озвучка роликов HyperFrames). `lessonAi`: `"configured"` | `"missing_key"` (если ключ Opus не задан, `POST` будет возвращать `503 AI_NOT_CONFIGURED`). Удобно для дебаг-панели.
+`videoProvider`: `"mock"` | `"ltx"` | `"hyperframes"`. `tts`: `"none"` | `"openai"` | `"elevenlabs"` | `"piper"` (озвучка роликов HyperFrames). `lessonAi`: `"configured"` | `"missing_key"` (если ключ Opus не задан, `POST` будет возвращать `503 AI_NOT_CONFIGURED`). Удобно для дебаг-панели.
 
 ---
 
