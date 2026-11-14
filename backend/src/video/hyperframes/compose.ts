@@ -49,10 +49,13 @@ export class CompositionWriter {
       {
         type: "text",
         text:
-          "Here are frames of your composition as rendered, at phone size, in time order. Review them as a harsh motion director " +
-          "for a premium explainer channel: is every frame instantly readable on a phone, is there one clear hero per frame, do the " +
-          "frames together tell the idea, is anything cramped, overlapping, cut off, too small, empty, off-look or cheap-looking " +
-          "(clutter, too many effects, random colours)? First list each real problem as one line: `t=… · where · problem → exact change`. " +
+          "Here are frames of your composition as rendered, at phone size, in time order. Review them as a harsh creative director " +
+          "of a top motion-design studio. P0 problems: a frame where the content is small or leaves a large empty area (the hero must " +
+          "fill the band from y=200 to y=1300), text that is unreadable on a phone, overlaps or crops that are not intended, a frame " +
+          "that reads as a slide or a template, any generated-design default from the list in your instructions (cream + serif + " +
+          "terracotta, near-black + one acid accent, identical rounded cards, one accented word in a headline, small mono labels, " +
+          "everything centred and tiny). P1: no signature device, weak contrast in scale or rhythm, a beat that does not explain its " +
+          "idea at a glance. First list each real problem as one line: `t=… · where · problem → exact change`. " +
           "If there are problems that matter, reply after the list with the complete corrected HTML document. " +
           "If the video is already clean and premium, reply with the single word APPROVED and nothing else.",
       },

@@ -10,6 +10,7 @@ import { fallbackComposition } from "./fallback.ts";
 import { HEIGHT, WIDTH } from "./prompt.ts";
 import { addFinishingLayer } from "./finish.ts";
 import { inlineIcons } from "./icons.ts";
+import { addFontFaces, copyKit } from "./kit.ts";
 import { captureFrames, reviewTimes } from "./review.ts";
 import { ensureVoiceTrack, sanitizeComposition } from "./sanitize.ts";
 
@@ -64,6 +65,7 @@ export async function runPipeline(
   const assetsDir = path.join(workDir, "assets");
   await mkdir(assetsDir, { recursive: true });
   await copyFile(GSAP_FILE, path.join(assetsDir, "gsap.min.js"));
+  await copyKit(assetsDir);
 
   await cb.stage("voice");
   const voice = await buildVoiceover(lesson.narration, assetsDir);
@@ -118,7 +120,7 @@ async function writeWithOpus(
     const iconProblems = missing.map(
       (n) => `[warning] unknown_icon: data-icon="${n}" is not a Lucide icon name, so it was dropped. Use another Lucide name.`,
     );
-    return { html: addFinishingLayer(html, voice.duration), iconProblems };
+    return { html: addFontFaces(addFinishingLayer(html, voice.duration)), iconProblems };
   };
   const index = path.join(workDir, "index.html");
   let html: string;
