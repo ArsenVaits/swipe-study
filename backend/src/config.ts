@@ -8,7 +8,7 @@ const intFromEnv = (def: number) => z.coerce.number().int().positive().default(d
 const EnvSchema = z.object({
   PORT: intFromEnv(3001),
   DATABASE_PATH: z.string().default("./data/scrolled.db"),
-  CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  CORS_ORIGIN: z.string().default("http://localhost:3000"),
 
   ANTHROPIC_API_KEY: z.string().optional(),
   OPUS_MODEL: z.string().default("claude-opus-5-5"),

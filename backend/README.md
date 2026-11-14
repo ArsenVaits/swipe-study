@@ -54,7 +54,7 @@ Same shape as above. Poll every 3–5 s while `status === "rendering_video"`.
 | `ready` | `videoUrl` is set |
 | `failed` | see `error.stage`: `"lesson"` → no lesson; `"video"` → **lesson and quiz are still in `lesson`**, show them without video |
 
-`videoUrl` may be relative (`/demo/lesson.mp4`) — proxy `/api` and `/demo` to the backend in the Vite dev server, or prefix with the backend origin.
+`videoUrl` may be relative (`/demo/lesson.mp4`) — the Next.js frontend already proxies `/api` and `/demo` to the backend; without the proxy, prefix with the backend origin.
 
 ## How it works
 
