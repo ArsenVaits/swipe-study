@@ -3,13 +3,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, Bookmark, Check, ChevronLeft, ChevronRight, CircleHelp, Clapperboard, FileText, Layers3, LoaderCircle, Plus, ShieldCheck, Sparkles, Trash2, Upload, Volume2, X } from "lucide-react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import { makeLocalLesson, normalizeText, type Lesson } from "@/lib/lesson";
+import { normalizeText, type Lesson } from "@/lib/lesson";
 import { sampleLesson, sampleName, samplePages, samplePdf, samplePoster, sampleVideo } from "@/lib/sample";
 import Player from "./player";
+import { createLessonJob, getLessonJob, getSessionId, LessonApiError, lessonErrorMessage, pollLessonJob, toLesson, type LessonJob } from "@/lib/lesson-api";
 
 type Source = { name: string; count: number; page: number; text: string; url: string; pdf?: PDFDocumentProxy };
-type Entry = { id: string; lesson: Lesson; name: string; sample?: number };
-type Clip = { video?: string; error?: string };
+type Entry = { id: string; lesson: Lesson; name: string; sample?: number; jobId?: string };
+type Clip = { video?: string; error?: string; retryStatus?: boolean };
 const examples: Entry[] = [
   { id: "sample-1", name: sampleName, lesson: sampleLesson, sample: 1 },
   { id: "sample-2", name: sampleName, lesson: {
@@ -41,6 +42,7 @@ export default function Studio() {
   const [panel, setPanel] = useState<"quiz" | "source">("quiz");
   const [selected, setSelected] = useState("");
   const [excerpt, setExcerpt] = useState("");
+  const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -55,6 +57,8 @@ export default function Studio() {
   const currentPdf = useRef<Source | null>(null);
   const clipUrls = useRef<string[]>([]);
   const renderJobs = useRef(new Set<string>());
+  const creation = useRef<AbortController | null>(null);
+  const videoRequests = useRef(new Map<string, AbortController>());
   const origins = useRef(new Map<string, string>());
   const documentUrls = useRef<string[]>([]);
   const readVersion = useRef(0);
@@ -63,6 +67,8 @@ export default function Studio() {
     try { setLibrary(JSON.parse(localStorage.getItem(archive) || "[]")); }
     catch { setLibrary([]); }
     return () => {
+      creation.current?.abort();
+      videoRequests.current.forEach((request) => request.abort());
       if (currentPdf.current?.pdf) void currentPdf.current.pdf.loadingTask.destroy();
       [...clipUrls.current, ...documentUrls.current].forEach((url) => URL.revokeObjectURL(url));
     };
@@ -114,7 +120,7 @@ export default function Studio() {
   }
 
   async function loadFile(file?: File) {
-    if (!file) return;
+    if (!file || creation.current) return;
     setTab("feed");
     setDragging(false);
     setError("");
@@ -141,6 +147,7 @@ export default function Studio() {
   }
 
   function openExample() {
+    if (creation.current) return;
     setTab("feed");
     readVersion.current++;
     switchSource({ name: sampleName, count: samplePages.length, page: 1, text: samplePages[0].text, url: samplePdf });
@@ -187,22 +194,75 @@ export default function Studio() {
     }
   }
 
-  function createLesson() {
-    if (!source || busy) return;
-    const text = excerpt || source.text;
-    if (normalizeText(text).split(" ").filter(Boolean).length < 12) {
-      setError("Choose at least 12 words so there is enough text for a question.");
+  async function loadVideo(jobId: string, initial?: LessonJob) {
+    if (videoRequests.current.has(jobId)) return;
+    const request = new AbortController();
+    videoRequests.current.set(jobId, request);
+    setClips((previous) => ({ ...previous, [jobId]: {} }));
+    try {
+      const job = await pollLessonJob(initial ?? await getLessonJob(jobId, request.signal), request.signal);
+      if (request.signal.aborted) return;
+      const clip: Clip = job.status === "ready" && job.videoUrl
+        ? { video: job.videoUrl }
+        : { error: job.error?.code === "VIDEO_LIMIT_REACHED"
+            ? "You have reached the video limit for this demo."
+            : "The server could not render this video." };
+      setClips((previous) => ({ ...previous, [jobId]: clip }));
+    } catch (cause) {
+      if (request.signal.aborted) return;
+      const missing = cause instanceof LessonApiError && cause.status === 404;
+      const clip = {
+        error: missing ? "The video job could not be found." : "Could not check the video status.",
+        retryStatus: !missing,
+      };
+      setClips((previous) => ({ ...previous, [jobId]: clip }));
+    } finally {
+      videoRequests.current.delete(jobId);
+    }
+  }
+
+  async function createLesson() {
+    if (!source || busy || creation.current) return;
+    setError("");
+    if (!source.pdf && !excerpt) {
+      goTo(examples[source.page - 1].id);
+      document.getElementById("lesson-feed")?.scrollIntoView({ block: "nearest" });
       return;
     }
-    setError("");
-    if (!source.pdf && !excerpt) return goTo(examples[source.page - 1].id);
-    const lesson = makeLocalLesson({ documentName: source.name, sourcePage: source.page, text });
-    const item = { id: crypto.randomUUID(), lesson, name: source.name };
-    origins.current.set(item.id, source.url);
-    setEntries((previous) => [item, ...previous]);
-    goTo(item.id, false);
-    void renderClip(item);
-    requestAnimationFrame(() => document.getElementById("lesson-feed")?.scrollIntoView({ block: "nearest" }));
+    const sourceText = (excerpt || source.text).trim();
+    if (sourceText.length < 80 || sourceText.length > 12_000) {
+      setError("Select a passage between 80 and 12,000 characters.");
+      return;
+    }
+    const request = new AbortController();
+    creation.current = request;
+    setCreating(true);
+    try {
+      const job = await createLessonJob({
+        sourceTitle: source.name.trim().slice(0, 200) || "Untitled PDF",
+        sourcePage: source.page,
+        sourceText,
+        sessionId: getSessionId(),
+      }, request.signal);
+      if (request.signal.aborted) return;
+      if (!job.lesson) {
+        setError(lessonErrorMessage(job.error?.code));
+        return;
+      }
+      const item: Entry = { id: job.jobId, jobId: job.jobId, lesson: toLesson(job.lesson), name: source.name };
+      origins.current.set(item.id, source.url);
+      setEntries((previous) => [item, ...previous]);
+      setTab("feed");
+      goTo(item.id, false);
+      void loadVideo(job.jobId, job);
+      requestAnimationFrame(() => document.getElementById("lesson-feed")?.scrollIntoView({ block: "nearest" }));
+    } catch (cause) {
+      if (request.signal.aborted) return;
+      setError(cause instanceof LessonApiError ? lessonErrorMessage(cause.code, cause.status) : lessonErrorMessage());
+    } finally {
+      creation.current = null;
+      if (!request.signal.aborted) setCreating(false);
+    }
   }
 
   function updateLibrary(next: Entry[], message: string) {
@@ -221,8 +281,9 @@ export default function Studio() {
   function openSaved(item: Entry) {
     if (!entries.some((record) => record.id === item.id)) {
       setEntries((previous) => [item, ...previous]);
-      if (!item.sample) void renderClip(item);
+      if (!item.sample && !item.jobId) void renderClip(item);
     }
+    if (item.jobId) void loadVideo(item.jobId);
     setTab("feed");
     goTo(item.id, false);
   }
@@ -240,7 +301,7 @@ export default function Studio() {
             <button type="button" aria-current={tab === "feed" ? "page" : undefined} onClick={() => { setTab("feed"); goTo(active, false); }}><Clapperboard size={16} /> <span>Lesson feed</span></button>
             <button type="button" aria-current={tab === "library" ? "page" : undefined} onClick={() => { setTab("library"); setNotice(""); }}><Bookmark size={16} /> <span>Saved</span></button>
           </nav>
-          <button type="button" className="header-action" aria-label="New lesson" onClick={() => input.current?.click()}><Plus size={18} /> <span>New lesson</span></button>
+          <button type="button" className="header-action" aria-label="New lesson" disabled={creating} onClick={() => input.current?.click()}><Plus size={18} /> <span>New lesson</span></button>
         </div>
       </header>
 
@@ -266,27 +327,27 @@ export default function Studio() {
         <main className="studio">
           <section className="upload-panel" ref={uploadPanel} aria-labelledby="upload-title">
             {source ? <>
-              <button className="back-link" type="button" onClick={() => { readVersion.current++; switchSource(null); setBusy(""); setError(""); }}><ArrowLeft size={15} /> Change PDF</button>
+              <button className="back-link" type="button" disabled={creating} onClick={() => { readVersion.current++; switchSource(null); setBusy(""); setError(""); }}><ArrowLeft size={15} /> Change PDF</button>
               <h1 id="upload-title" className="editor-title">Choose a passage.</h1>
-              <p className="editor-description">Use the full page or highlight the part you want to learn.</p>
+              <p className="editor-description">Choose a full page or highlight a passage. ScrollEd sends the chosen text and document details to create your lesson.</p>
               <div className="document-panel">
                 <div className="document-name"><FileText size={17} /><strong title={source.name}>{source.name}</strong><a href={source.url + "#page=" + source.page} target="_blank" rel="noreferrer" aria-label="Open original PDF"><ArrowUpRight size={16} /></a></div>
                 <div className="page-nav">
-                  <button className="icon-control" type="button" aria-label="Previous page" disabled={source.page <= 1 || !!busy} onClick={() => void movePage(source.page - 1)}><ChevronLeft size={17} /></button>
-                  <label>Page <select aria-label="PDF page" value={source.page} disabled={!!busy} onChange={(event) => void movePage(Number(event.target.value))}>{Array.from({length: source.count}, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}</select> of {source.count}</label>
-                  <button className="icon-control" type="button" aria-label="Next page" disabled={source.page >= source.count || !!busy} onClick={() => void movePage(source.page + 1)}><ChevronRight size={17} /></button>
+                  <button className="icon-control" type="button" aria-label="Previous page" disabled={source.page <= 1 || !!busy || creating} onClick={() => void movePage(source.page - 1)}><ChevronLeft size={17} /></button>
+                  <label>Page <select aria-label="PDF page" value={source.page} disabled={!!busy || creating} onChange={(event) => void movePage(Number(event.target.value))}>{Array.from({length: source.count}, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}</select> of {source.count}</label>
+                  <button className="icon-control" type="button" aria-label="Next page" disabled={source.page >= source.count || !!busy || creating} onClick={() => void movePage(source.page + 1)}><ChevronRight size={17} /></button>
                 </div>
                 <p className="passage" tabIndex={0} ref={passage} onPointerUp={highlight} onKeyUp={highlight}>{source.text || "This page has no readable text. Choose another page or use a PDF with selectable text."}</p>
                 {source.text && <div className="selection-row">{excerpt
-                  ? <><span>{excerpt.split(" ").length} words</span><button type="button" className="text-button" onClick={() => setExcerpt("")}>Use full page</button></>
-                  : <button type="button" className="text-button" disabled={!selected} onClick={() => {
-                    if (selected.split(" ").length < 12) return setError("Highlight at least 12 words.");
+                  ? <><span>{excerpt.split(" ").length} words</span><button type="button" className="text-button" disabled={creating} onClick={() => { setExcerpt(""); setError(""); }}>Use full page</button></>
+                  : <button type="button" className="text-button" disabled={!selected || creating} onClick={() => {
+                    if (selected.length < 80 || selected.length > 12_000) return setError("Highlight 80 to 12,000 characters.");
                     setExcerpt(selected); setError(""); window.getSelection()?.removeAllRanges();
                   }}>Use highlighted text</button>}</div>}
               </div>
               {excerpt && <blockquote className="selected-excerpt">{excerpt}</blockquote>}
-              <button type="button" className="primary create-button" disabled={!!busy || !source.text} onClick={createLesson}><Sparkles size={18} /> Create my lesson <ArrowRight size={16} /></button>
-              {busy && <p role="status" className="support-text">{busy}</p>}
+              <button type="button" className="primary create-button" disabled={!!busy || creating || !source.text} onClick={() => void createLesson()}>{creating ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />} {creating ? "Creating lesson…" : "Create my lesson"} <ArrowRight size={16} /></button>
+              {(busy || creating) && <p role="status" className="support-text">{busy || "Preparing the notes and quiz. This usually takes 10–40 seconds."}</p>}
             </> : <>
               <h1 id="upload-title" className="hero-title">Your PDFs.<br /><em>In a scroll.</em></h1>
               <p className="hero-description">Turn a passage from a work PDF into a short lesson you can watch, quiz, and revisit.</p>
@@ -315,12 +376,13 @@ export default function Studio() {
                   const media = item.sample ? sampleMedia[item.sample - 1] : { video: clips[item.id]?.video, poster: undefined };
                   return (
                     <article key={item.id} className="short" id={"short-" + item.id} aria-label={item.lesson.title}>
-                      {media.video ? <Player video={media.video} poster={media.poster} captions={item.lesson.captions} title={item.lesson.title} sample={!!item.sample} active={item.id === active} />
-                        : <div className="recap-state" role="status">
+                      {media.video ? <Player video={media.video} poster={media.poster} captions={item.lesson.captions} title={item.lesson.title} sample={!!item.sample} serverVideo={!!item.jobId} demoVideo={media.video.startsWith("/demo/")} active={item.id === active} onRefresh={item.jobId ? () => void loadVideo(item.jobId!) : undefined} />
+                        : <div className="recap-state" role="status" inert={item.id !== active}>
                           {clips[item.id]?.error ? <Clapperboard size={28} /> : <LoaderCircle className="spin" size={28} />}
                           <strong>{clips[item.id]?.error ? "Video unavailable" : "Rendering your recap"}</strong>
                           <p>{clips[item.id]?.error || "The notes and quiz are ready."}</p>
-                          {clips[item.id]?.error && <button className="secondary" type="button" onClick={() => void renderClip(item)}>Retry video</button>}
+                          {clips[item.id]?.retryStatus && item.jobId && <button className="secondary" type="button" onClick={() => void loadVideo(item.jobId!)}>Check status again</button>}
+                          {clips[item.id]?.error && !item.jobId && <button className="secondary" type="button" onClick={() => void renderClip(item)}>Retry video</button>}
                         </div>}
                     </article>
                   );
@@ -376,13 +438,13 @@ function Quiz({ entry, sourceUrl }: { entry: Entry; sourceUrl?: string }) {
     <form className="quiz" onSubmit={(event) => { event.preventDefault(); if (answer !== null) setChecked(true); }}>
       <fieldset disabled={checked}>
         <legend>{lesson.quiz.question}</legend>
-        {!entry.sample && <blockquote className="quiz-passage">{lesson.quiz.cloze || lesson.source.quote.replace(lesson.quiz.options[lesson.quiz.correctIndex], "_____")}</blockquote>}
+        {!entry.sample && !entry.jobId && <blockquote className="quiz-passage">{lesson.quiz.cloze || lesson.source.quote.replace(lesson.quiz.options[lesson.quiz.correctIndex], "_____")}</blockquote>}
         {lesson.quiz.options.map((option, index) => {
           const correct = checked && index === lesson.quiz.correctIndex;
           const wrong = checked && answer === index && !correct;
           return <label key={index} className={"quiz-option" + (correct ? " is-correct" : wrong ? " is-wrong" : "")}>
             <input type="radio" name="answer" checked={answer === index} onChange={() => setAnswer(index)} />
-            <span className="option-letter">{["A", "B", "C"][index]}</span><span>{option}</span>
+            <span className="option-letter">{["A", "B", "C", "D"][index]}</span><span>{option}</span>
             {correct && <span className="answer-marker"><Check size={15} /><span className="sr-only">Correct answer</span></span>}
             {wrong && <span className="answer-marker"><X size={15} /><span className="sr-only">Incorrect answer</span></span>}
           </label>;
@@ -390,6 +452,7 @@ function Quiz({ entry, sourceUrl }: { entry: Entry; sourceUrl?: string }) {
       </fieldset>
       {checked ? <div className="quiz-feedback">
         <div role="status"><strong>{answer === lesson.quiz.correctIndex ? "Correct!" : "Here is the answer"}</strong><p>{lesson.quiz.explanation}</p></div>
+        <blockquote className="quiz-passage">“{lesson.source.quote}”</blockquote>
         <SourceLink entry={entry} url={sourceUrl} />
         <button className="text-button" type="button" onClick={() => { setAnswer(null); setChecked(false); }}>Try again</button>
       </div> : <button className="primary check-button" type="submit" disabled={answer === null}>Check answer <ArrowRight size={16} /></button>}

@@ -8,3 +8,4 @@ public/pdf/
 next-env.d.ts
 
 .vercel
+!.env.example

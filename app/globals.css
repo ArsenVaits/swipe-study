@@ -114,7 +114,7 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 .lesson-info { padding: clamp(17px, 1.8vw, 25px) clamp(16px, 1.7vw, 24px) 15px; }
 .lesson-kicker { color: var(--purple-dark); display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; margin-bottom: 11px; }
 .lesson-info h2 { font-size: clamp(23px, 2.15vw, 34px); letter-spacing: -.035em; line-height: 1.08; margin: 0; font-weight: 850; }
-.lesson-info p { color: var(--muted); line-height: 1.57; font-size: 14px; margin: 13px 0 8px; overflow-wrap: anywhere; }
+.lesson-info p { white-space: pre-line; color: var(--muted); line-height: 1.57; font-size: 14px; margin: 13px 0 8px; overflow-wrap: anywhere; }
 .read-aloud { min-height: 34px; }
 .detail-tabs { display: flex; gap: 20px; padding: 0 clamp(16px, 1.7vw, 24px); border-bottom: 1px solid var(--line); }
 .detail-tabs button { min-height: 43px; font-size: 14px; font-weight: 700; color: var(--muted); position: relative; }
