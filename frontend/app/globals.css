@@ -115,7 +115,7 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 .detail-panel { background: white; border: 1px solid var(--line); border-radius: 16px; margin-top: 36px; min-width: 0; }
 .lesson-info { padding: clamp(17px, 1.8vw, 25px) clamp(16px, 1.7vw, 24px) 15px; }
 .lesson-kicker { color: var(--purple-dark); display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; margin-bottom: 11px; }
-.lesson-info h2 { font-size: clamp(23px, 2.15vw, 34px); letter-spacing: -.035em; line-height: 1.08; margin: 0; font-weight: 850; }
+.lesson-info h2 { font-size: clamp(20px, 1.65vw, 26px); letter-spacing: -.035em; line-height: 1.25; margin: 0; font-weight: 850; }
 .lesson-info h2, .quiz legend, .video-cover-title, .recap-state strong { overflow-wrap: anywhere; }
 .lesson-info p { white-space: pre-line; color: var(--muted); line-height: 1.57; font-size: 14px; margin: 13px 0 8px; overflow-wrap: anywhere; }
 .read-aloud { min-height: 34px; }
@@ -149,7 +149,7 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 .editor-title { font-size: clamp(25px, 2.2vw, 34px); line-height: 1.15; font-weight: 830; margin: 8px 0 0; letter-spacing: -.035em; }
 .editor-description, .support-text { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 9px 0 13px; }
 .document-panel { border: 1px solid var(--line); border-radius: 13px; overflow: hidden; min-width: 0; background: #fff; }
-.document-name { display: flex; align-items: center; gap: 8px; min-width: 0; border-bottom: 1px solid var(--line); padding: 10px; font-size: 13px; }
+.document-name { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px; font-size: 13px; }
 .document-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .document-name svg { flex-shrink: 0; color: var(--purple); }
 .document-name a { display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; margin-left: auto; }

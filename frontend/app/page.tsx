@@ -1,6 +1,6 @@
 'use client'
 
-import { normalizeText, type Lesson } from '@/lib/lesson'
+import type { Lesson } from '@/lib/lesson'
 import {
   createLessonJob,
   getLessonJob,
@@ -27,8 +27,6 @@ import {
   ArrowUpRight,
   Bookmark,
   Check,
-  ChevronLeft,
-  ChevronRight,
   CircleHelp,
   Clapperboard,
   FileText,
@@ -95,8 +93,6 @@ export default function Studio() {
   const [library, setLibrary] = useState<Entry[]>([])
   const [tab, setTab] = useState<'feed' | 'library'>('feed')
   const [panel, setPanel] = useState<'quiz' | 'source'>('quiz')
-  const [selected, setSelected] = useState('')
-  const [excerpt, setExcerpt] = useState('')
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -104,7 +100,6 @@ export default function Studio() {
   const [clips, setClips] = useState<Record<string, Clip>>({})
   const [dragging, setDragging] = useState(false)
   const input = useRef<HTMLInputElement>(null)
-  const passage = useRef<HTMLParagraphElement>(null)
   const uploadPanel = useRef<HTMLElement>(null)
   const detailPanel = useRef<HTMLElement>(null)
   const feed = useRef<HTMLDivElement>(null)
@@ -182,8 +177,6 @@ export default function Studio() {
     if (prior && prior !== next?.pdf) void prior.loadingTask.destroy()
     currentPdf.current = next
     setSource(next)
-    setSelected('')
-    setExcerpt('')
   }
 
   async function loadFile(file?: File) {
@@ -229,34 +222,6 @@ export default function Studio() {
     setError('')
     goTo(examples[0].id)
     requestAnimationFrame(() => uploadPanel.current?.scrollIntoView({ block: 'nearest' }))
-  }
-
-  async function movePage(page: number) {
-    if (!source || busy || page < 1 || page > source.count || page === source.page) return
-    const version = ++readVersion.current
-    setBusy('Reading page…')
-    setError('')
-    try {
-      const text = source.pdf
-        ? await (await import('@/lib/pdf')).readPage(source.pdf, page)
-        : samplePages[page - 1].text
-      if (version === readVersion.current) switchSource({ ...source, page, text })
-    } catch {
-      if (version === readVersion.current)
-        setError('This page could not be read. Choose another page.')
-    } finally {
-      if (version === readVersion.current) setBusy('')
-    }
-  }
-
-  function highlight() {
-    const selection = window.getSelection()
-    const container = selection?.rangeCount ? selection.getRangeAt(0).commonAncestorContainer : null
-    setSelected(
-      container && passage.current?.contains(container)
-        ? normalizeText(selection?.toString() || '')
-        : ''
-    )
   }
 
   async function renderClip(item: Entry) {
@@ -317,14 +282,14 @@ export default function Studio() {
   async function createLesson() {
     if (!source || busy || creation.current) return
     setError('')
-    if (!source.pdf && !excerpt) {
+    if (!source.pdf) {
       goTo(examples[source.page - 1].id)
       document.getElementById('lesson-feed')?.scrollIntoView({ block: 'nearest' })
       return
     }
-    const sourceText = (excerpt || source.text).trim()
+    const sourceText = source.text.trim()
     if (sourceText.length < 80 || sourceText.length > 12_000) {
-      setError('Select a passage between 80 and 12,000 characters.')
+      setError('The first page must contain between 80 and 12,000 characters.')
       return
     }
     const request = new AbortController()
@@ -540,8 +505,7 @@ export default function Studio() {
                   Choose a passage.
                 </h1>
                 <p className='editor-description'>
-                  Choose a full page or highlight a passage. ScrollEd sends the chosen text and
-                  document details to create your lesson.
+                  ScrollEd uses the first page of your PDF to create your lesson.
                 </p>
                 <div className='document-panel'>
                   <div className='document-name'>
@@ -556,89 +520,12 @@ export default function Studio() {
                       <ArrowUpRight size={16} />
                     </a>
                   </div>
-                  <div className='page-nav'>
-                    <button
-                      className='icon-control'
-                      type='button'
-                      aria-label='Previous page'
-                      disabled={source.page <= 1 || !!busy || creating}
-                      onClick={() => void movePage(source.page - 1)}
-                    >
-                      <ChevronLeft size={17} />
-                    </button>
-                    <label>
-                      Page{' '}
-                      <select
-                        aria-label='PDF page'
-                        value={source.page}
-                        disabled={!!busy || creating}
-                        onChange={event => void movePage(Number(event.target.value))}
-                      >
-                        {Array.from({ length: source.count }, (_, i) => (
-                          <option key={i} value={i + 1}>
-                            {i + 1}
-                          </option>
-                        ))}
-                      </select>{' '}
-                      of {source.count}
-                    </label>
-                    <button
-                      className='icon-control'
-                      type='button'
-                      aria-label='Next page'
-                      disabled={source.page >= source.count || !!busy || creating}
-                      onClick={() => void movePage(source.page + 1)}
-                    >
-                      <ChevronRight size={17} />
-                    </button>
-                  </div>
-                  <p
-                    className='passage'
-                    tabIndex={0}
-                    ref={passage}
-                    onPointerUp={highlight}
-                    onKeyUp={highlight}
-                  >
-                    {source.text ||
-                      'This page has no readable text. Choose another page or use a PDF with selectable text.'}
-                  </p>
-                  {source.text && (
-                    <div className='selection-row'>
-                      {excerpt ? (
-                        <>
-                          <span>{excerpt.split(' ').length} words</span>
-                          <button
-                            type='button'
-                            className='text-button'
-                            disabled={creating}
-                            onClick={() => {
-                              setExcerpt('')
-                              setError('')
-                            }}
-                          >
-                            Use full page
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type='button'
-                          className='text-button'
-                          disabled={!selected || creating}
-                          onClick={() => {
-                            if (selected.length < 80 || selected.length > 12_000)
-                              return setError('Highlight 80 to 12,000 characters.')
-                            setExcerpt(selected)
-                            setError('')
-                            window.getSelection()?.removeAllRanges()
-                          }}
-                        >
-                          Use highlighted text
-                        </button>
-                      )}
-                    </div>
-                  )}
                 </div>
-                {excerpt && <blockquote className='selected-excerpt'>{excerpt}</blockquote>}
+                {!source.text && (
+                  <p className='support-text' role='status'>
+                    The first page has no readable text. Choose a PDF with selectable text.
+                  </p>
+                )}
                 <button
                   type='button'
                   className='primary create-button'
