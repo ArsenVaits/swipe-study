@@ -55,6 +55,22 @@ ${captions ? `  <div id="cap1" class="cap clip" data-start="..." data-duration="
 - Frame 0 is the thumbnail: the title or the key picture is already on screen at 0 s, never an empty background.
 - One subject, centred, stacked vertically. Nothing meant to be read under 36 px; titles 80-140 px, one or two lines, about 5 words per line. Cut words, never shrink text to fit. One accent colour that carries meaning; strong contrast (WCAG AA at least).
 
+# Look: pick exactly one, use only its values
+The video must look like a premium studio explainer, not a slide deck: restrained, confident, lots of air. Choose the one look that fits the topic and use only its colours (opacity variations allowed) and fonts. The backend adds film grain and a soft vignette on top; do not add your own grain, noise, vignette or film effects.
+- NIGHT LAB (technology, software, internet, engineering): ground #0B0E1A with one radial glow rgba(108,140,255,0.18) behind the hero; ink #F2F4FF; muted #8B93B5; surface #161B33 with 1.5px border #2A3366; accent #FF6B3D; support #6C8CFF. Titles Montserrat 800; labels and code JetBrains Mono 500.
+- PAPER EDITORIAL (history, psychology, business, society, language, art): ground #F3EEE4 solid; ink #1A1A22; muted #6F6A62; surface #FFFFFF with 1.5px border #D9D0C1; accent #D2461E; support #2C5D8F. Titles Playfair Display 700; labels Montserrat 600.
+- DEEP FIELD (physics, biology, chemistry, space, nature, medicine): ground #06141B with one radial glow rgba(45,212,191,0.16); ink #EAFBF8; muted #86A9A6; surface #0E2630 with 1.5px border #1F4B57; accent #FFC24B; support #2DD4BF. Titles Montserrat 800; numbers Oswald 600.
+- MONO SIGNAL (finance, economics, statistics, data, law): ground #101010 solid; ink #FAFAFA; muted #8A8A8A; surface #1A1A1A with 1.5px border #2E2E2E; accent #C8FF3D; support #FFFFFF at 35%. Titles Oswald 600 uppercase with 0.02em tracking; labels JetBrains Mono 500.
+Rules that keep it expensive and calm:
+- Dark grounds use a solid fill plus one radial glow, never a full-screen linear gradient (it bands in H.264). No text gradients, no neon or outer glows on text, no emoji, no clip-art, no shadows darker than rgba(0,0,0,0.25).
+- One hero element per frame, clearly the largest; everything else is smaller and quieter. The accent colour marks only the one thing that matters in the frame.
+- At most 3 elements moving at the same moment; at most 3 kinds of scene transition in the whole video; one signature move repeated with variation is better than many effects.
+- Generous margins: content sits inside x 90-910 and y 200-1300, with clear space between groups. Align to a grid (left edge x=90 or centred).
+
+# Icons
+- Real vector icons are available: write an empty placeholder <i data-icon="NAME" class="..." style="width:120px;height:120px;color:#F2F4FF"></i> and the backend replaces it with the Lucide icon NAME (stroke icon, colour = CSS color, stroke width via data-stroke="1.5"). NAME is a Lucide icon name (lucide.dev), e.g. server, database, globe, lock, shield-check, cloud, cpu, smartphone, laptop, user, users, file-text, folder, git-branch, git-merge, git-commit-horizontal, search, mail, key-round, sun, moon, zap, atom, flask-conical, dna, leaf, droplet, thermometer, eye, brain, heart-pulse, chart-line, chart-column, trending-up, coins, wallet, scale, clock, calendar, map-pin, arrow-right, check, x, circle-alert, lightbulb, book-open, graduation-cap, message-circle.
+- Use icons to make the objects in a diagram recognisable (a server, a phone, a lock), 72-160 px, in the look's colours, at most 4 on screen at once. Never decorate with icons, never put icons in coloured circles. Animate the wrapper or the svg itself (scale, opacity, strokeDashoffset on its paths).
+
 # How to explain
 - One idea the viewer understands by the end. Start from a situation or question the viewer knows, then bring in the device that answers it, and end on the idea in one line.
 - Devices that explain: one diagram that grows (add one part per beat, when the voice names it; never the finished diagram at once), boxes and arrows that show flow, a number that lands, before/after, a myth struck through, steps in order, many things converging into a few groups. Pick the shape of each line first, then its picture, so different lines get different pictures. Draw with HTML/CSS and inline SVG (paths with stroke-dashoffset draw-ons are great).

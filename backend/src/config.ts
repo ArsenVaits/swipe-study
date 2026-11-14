@@ -38,6 +38,11 @@ const EnvSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  // After the checks, the model reviews phone-size frames of its render and may revise once.
+  HYPERFRAMES_REVIEW: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
   HYPERFRAMES_FIX_ROUNDS: z.coerce.number().int().min(0).max(2).default(2),
   HYPERFRAMES_KEEP_WORK_DIRS: z
     .enum(["true", "false"])
