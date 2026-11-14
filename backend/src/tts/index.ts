@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { config } from "../config.ts";
 
@@ -40,6 +42,9 @@ export function ttsConfigProblem(): string | null {
   if (config.TTS_PROVIDER === "openai" && !config.OPENAI_API_KEY) return "TTS_PROVIDER=openai but OPENAI_API_KEY is not set.";
   if (config.TTS_PROVIDER === "elevenlabs" && (!config.ELEVENLABS_API_KEY || !config.ELEVENLABS_VOICE_ID)) {
     return "TTS_PROVIDER=elevenlabs needs ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID.";
+  }
+  if (config.TTS_PROVIDER === "piper" && (!config.PIPER_MODEL || !existsSync(config.PIPER_MODEL))) {
+    return "TTS_PROVIDER=piper needs PIPER_MODEL pointing to an existing .onnx voice.";
   }
   return null;
 }
@@ -85,7 +90,67 @@ function silentTimeline(texts: string[]): Voiceover {
 }
 
 async function synthesize(text: string): Promise<Buffer> {
-  return config.TTS_PROVIDER === "openai" ? openAiSpeech(text) : elevenLabsSpeech(text);
+  if (config.TTS_PROVIDER === "openai") return openAiSpeech(text);
+  if (config.TTS_PROVIDER === "piper") return piperSpeech(text);
+  return elevenLabsSpeech(text);
+}
+
+// Piper writes raw 16-bit mono PCM at the voice's own rate (22050 Hz for "medium" voices);
+// FFmpeg resamples it to our 24 kHz.
+async function piperSpeech(text: string): Promise<Buffer> {
+  const model = config.PIPER_MODEL!;
+  const pcm = await pipeThrough(
+    config.PIPER_BIN,
+    ["-m", model, "--output-raw", "--length-scale", String(config.PIPER_LENGTH_SCALE)],
+    Buffer.from(text, "utf8"),
+  );
+  const rate = piperSampleRate(model);
+  if (rate === SAMPLE_RATE) return pcm;
+  return pipeThrough(
+    config.FFMPEG_PATH,
+    ["-v", "error", "-f", "s16le", "-ar", String(rate), "-ac", "1", "-i", "pipe:0", "-f", "s16le", "-ar", String(SAMPLE_RATE), "-ac", "1", "pipe:1"],
+    pcm,
+  );
+}
+
+const piperRates = new Map<string, number>();
+function piperSampleRate(model: string): number {
+  let rate = piperRates.get(model);
+  if (!rate) {
+    try {
+      rate = Number(JSON.parse(readFileSync(`${model}.json`, "utf8"))?.audio?.sample_rate) || 22050;
+    } catch {
+      rate = 22050;
+    }
+    piperRates.set(model, rate);
+  }
+  return rate;
+}
+
+/** Runs a command with `input` on stdin and returns its stdout as bytes. */
+function pipeThrough(cmd: string, args: string[], input: Buffer, timeoutMs = 60_000): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { stdio: ["pipe", "pipe", "pipe"] });
+    const out: Buffer[] = [];
+    let err = "";
+    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    child.stdout.on("data", (d: Buffer) => out.push(d));
+    child.stderr.on("data", (d: Buffer) => {
+      if (err.length < 2000) err += d.toString();
+    });
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      reject(new TtsError(`${cmd}: ${e.message}`));
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      const buf = Buffer.concat(out);
+      if (code === 0 && buf.length > 0) resolve(buf);
+      else reject(new TtsError(`${cmd} exited with ${code}: ${err.trim().slice(0, 300)}`));
+    });
+    child.stdin.on("error", () => {});
+    child.stdin.end(input);
+  });
 }
 
 // https://platform.openai.com/docs/api-reference/audio/createSpeech — "pcm" = 24 kHz 16-bit LE mono.

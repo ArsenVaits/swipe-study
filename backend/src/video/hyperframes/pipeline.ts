@@ -8,7 +8,7 @@ import { hyperframes, parseJsonOutput, run } from "./cli.ts";
 import { CompositionWriter, ComposeError, type AudioAssets } from "./compose.ts";
 import { fallbackComposition } from "./fallback.ts";
 import { HEIGHT, WIDTH } from "./prompt.ts";
-import { sanitizeComposition } from "./sanitize.ts";
+import { ensureVoiceTrack, sanitizeComposition } from "./sanitize.ts";
 
 export type Stage = "queued" | "voice" | "writing" | "checking" | "rendering" | "finishing" | "ready" | "failed";
 
@@ -100,7 +100,8 @@ async function writeWithOpus(
   if (!config.ANTHROPIC_API_KEY) return null;
   const writer = new CompositionWriter(lesson, voice, audio);
   try {
-    let html = sanitizeComposition(await writer.draft());
+    const clean = (raw: string) => ensureVoiceTrack(sanitizeComposition(raw), voice.file, voice.duration);
+    let html = clean(await writer.draft());
     for (let round = 0; ; round++) {
       await writeFile(path.join(workDir, "index.html"), html);
       await cb.stage("checking");
@@ -112,7 +113,7 @@ async function writeWithOpus(
         return blocking === 0 ? html : null;
       }
       await cb.stage("writing");
-      html = sanitizeComposition(await writer.fix(problems));
+      html = clean(await writer.fix(problems));
     }
   } catch (err) {
     if (err instanceof ComposeError) console.warn("[hyperframes] composition step failed:", err.message);

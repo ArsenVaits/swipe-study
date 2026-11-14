@@ -14,6 +14,17 @@ const CSP = [
 
 const HEAD_INJECT = `<meta http-equiv="Content-Security-Policy" content="${CSP}">\n<script src="assets/gsap.min.js"></script>`;
 
+/**
+ * Makes sure the voiceover is in the mix even if the composition forgot it:
+ * adds the <audio id="voice"> clip right inside the root composition element.
+ */
+export function ensureVoiceTrack(html: string, voiceFile: string | null, duration: number): string {
+  if (!voiceFile || html.includes(`assets/${voiceFile}`)) return html;
+  const tag = `\n<audio id="voice" class="clip" src="assets/${voiceFile}" data-start="0" data-duration="${duration}" data-volume="1"></audio>`;
+  const root = /<div\b[^>]*data-composition-id=["']main["'][^>]*>/i;
+  return root.test(html) ? html.replace(root, (m) => m + tag) : html;
+}
+
 /** Pulls the HTML document out of a model reply (tolerates code fences and stray text). */
 export function extractHtml(reply: string): string | null {
   const m = reply.match(/<!doctype html[\s\S]*<\/html>/i) ?? reply.match(/<html[\s\S]*<\/html>/i);
