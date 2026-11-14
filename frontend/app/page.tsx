@@ -87,6 +87,7 @@ const sampleMedia = [
 const archive = 'scrolled-library-v1'
 const wheelGestureGap = 180
 const wheelThreshold = 30
+const swipeThreshold = 40
 
 export default function Studio() {
   const [source, setSource] = useState<Source | null>(null)
@@ -107,6 +108,7 @@ export default function Studio() {
   const studio = useRef<HTMLElement>(null)
   const feed = useRef<HTMLDivElement>(null)
   const wheelGesture = useRef({ lastEvent: -Infinity, distance: 0, consumed: false })
+  const touchGesture = useRef<{ id: number; x: number; y: number; consumed: boolean } | null>(null)
   const requestedShort = useRef<{ id: string; smooth: boolean } | null>(null)
   const currentPdf = useRef<Source | null>(null)
   const clipUrls = useRef<string[]>([])
@@ -162,20 +164,23 @@ export default function Studio() {
     const workspace = studio.current
     if (!workspace) return
 
+    function gestureTarget(target: EventTarget | null, y: number) {
+      const scroller = feed.current
+      if (!scroller || !(target instanceof Element) || target.closest('.site-header, .skip-link')) return null
+      for (let element: Element | null = target; element && element !== workspace; element = element.parentElement) {
+        if (element.matches('input, textarea, select, [contenteditable], .passage')) return null
+        if (element !== scroller && element.scrollHeight > element.clientHeight &&
+            /auto|scroll/.test(getComputedStyle(element).overflowY)) return null
+      }
+      const bounds = scroller.getBoundingClientRect()
+      return y >= bounds.top - 44 && y <= bounds.bottom + 36 ? scroller : null
+    }
+
     function scrollFeed(event: WheelEvent) {
       if (event.defaultPrevented || !event.cancelable || event.ctrlKey || event.shiftKey) return
       if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
-      if (!(event.target instanceof Element)) return
-
-      const scroller = feed.current
+      const scroller = gestureTarget(event.target, event.clientY)
       if (!scroller) return
-      for (let element: Element | null = event.target; element && element !== workspace; element = element.parentElement) {
-        if (element.matches('input, textarea, select, [contenteditable]')) return
-        if (element !== scroller && element.scrollHeight > element.clientHeight &&
-            /auto|scroll/.test(getComputedStyle(element).overflowY)) return
-      }
-      const bounds = scroller.getBoundingClientRect()
-      if (event.clientY < bounds.top - 44 || event.clientY > bounds.bottom + 36) return
 
       const gesture = wheelGesture.current
       if (event.timeStamp - gesture.lastEvent > wheelGestureGap) {
@@ -202,8 +207,71 @@ export default function Studio() {
       goTo(next.id)
     }
 
-    workspace.addEventListener('wheel', scrollFeed, { passive: false })
-    return () => workspace.removeEventListener('wheel', scrollFeed)
+    let pointer: { id: number; x: number; y: number } | undefined
+
+    function startPointer(event: PointerEvent) {
+      if (event.pointerType === 'touch' || event.button !== 0 ||
+          !(event.target instanceof Element) || event.target.closest('button, a, label') ||
+          !gestureTarget(event.target, event.clientY)) return
+      if (!event.target.closest('.upload-panel, .detail-panel')) event.preventDefault()
+      pointer = { id: event.pointerId, x: event.clientX, y: event.clientY }
+    }
+
+    function finishPointer(event: PointerEvent) {
+      if (pointer?.id !== event.pointerId) return
+      const { x, y } = pointer
+      pointer = undefined
+      if (event.type === 'pointercancel') return
+      const delta = y - event.clientY
+      if (Math.abs(delta) < swipeThreshold || Math.abs(delta) <= Math.abs(x - event.clientX)) return
+      const next = entries[index + Math.sign(delta)]
+      if (next) goTo(next.id)
+    }
+
+    function startTouch(event: TouchEvent) {
+      touchGesture.current = null
+      if (event.touches.length !== 1 || !(event.target instanceof Element) ||
+          event.target.closest('button, a, label')) return
+      const finger = event.touches[0]
+      if (gestureTarget(event.target, finger.clientY)) {
+        touchGesture.current = { id: finger.identifier, x: finger.clientX, y: finger.clientY, consumed: false }
+      }
+    }
+
+    function moveTouch(event: TouchEvent) {
+      const touch = touchGesture.current
+      if (!touch || event.touches.length !== 1 || !event.cancelable) return
+      const finger = event.touches[0]
+      if (finger.identifier !== touch.id) return
+      if (touch.consumed) {
+        event.preventDefault()
+        return
+      }
+      const delta = touch.y - finger.clientY
+      if (Math.abs(delta) < 8 || Math.abs(delta) <= Math.abs(touch.x - finger.clientX)) return
+      const next = entries[index + Math.sign(delta)]
+      if (!next) return
+      event.preventDefault()
+      if (Math.abs(delta) >= swipeThreshold) {
+        touch.consumed = true
+        goTo(next.id)
+      }
+    }
+
+    document.addEventListener('wheel', scrollFeed, { passive: false })
+    document.addEventListener('pointerdown', startPointer)
+    window.addEventListener('pointerup', finishPointer)
+    window.addEventListener('pointercancel', finishPointer)
+    document.addEventListener('touchstart', startTouch, { passive: true })
+    document.addEventListener('touchmove', moveTouch, { passive: false })
+    return () => {
+      document.removeEventListener('wheel', scrollFeed)
+      document.removeEventListener('pointerdown', startPointer)
+      window.removeEventListener('pointerup', finishPointer)
+      window.removeEventListener('pointercancel', finishPointer)
+      document.removeEventListener('touchstart', startTouch)
+      document.removeEventListener('touchmove', moveTouch)
+    }
   }, [tab, entries, index, goTo])
 
   function onFeedScroll() {
