@@ -8,9 +8,12 @@ import { hyperframes, parseJsonOutput, run } from "./cli.ts";
 import { CompositionWriter, ComposeError, type AudioAssets } from "./compose.ts";
 import { fallbackComposition } from "./fallback.ts";
 import { HEIGHT, WIDTH } from "./prompt.ts";
+import { addFinishingLayer } from "./finish.ts";
+import { inlineIcons } from "./icons.ts";
+import { captureFrames, reviewTimes } from "./review.ts";
 import { ensureVoiceTrack, sanitizeComposition } from "./sanitize.ts";
 
-export type Stage = "queued" | "voice" | "writing" | "checking" | "rendering" | "finishing" | "ready" | "failed";
+export type Stage = "queued" | "voice" | "writing" | "checking" | "reviewing" | "rendering" | "finishing" | "ready" | "failed";
 
 export interface PipelineCallbacks {
   stage(stage: Stage): Promise<void>;
@@ -69,7 +72,7 @@ export async function runPipeline(
   await cb.stage("writing");
   let html = await writeWithOpus(workDir, lesson, voice, audio, cb);
   const usedFallback = html === null;
-  if (html === null) html = fallbackComposition(lesson, voice, config.HYPERFRAMES_CAPTIONS);
+  if (html === null) html = addFinishingLayer(fallbackComposition(lesson, voice, config.HYPERFRAMES_CAPTIONS), voice.duration);
   await writeFile(path.join(workDir, "index.html"), html);
 
   await cb.stage("rendering");
@@ -80,7 +83,7 @@ export async function runPipeline(
     fellBack = true;
     await copyFile(path.join(workDir, "index.html"), path.join(workDir, "opus-rejected.html"));
     console.warn(`[hyperframes] ${jobId}: Opus composition failed to render, using the fallback template`);
-    await writeFile(path.join(workDir, "index.html"), fallbackComposition(lesson, voice, config.HYPERFRAMES_CAPTIONS));
+    await writeFile(path.join(workDir, "index.html"), addFinishingLayer(fallbackComposition(lesson, voice, config.HYPERFRAMES_CAPTIONS), voice.duration));
     rendered = await renderSlots.use(() => render(workDir, rawMp4));
   }
   if (!rendered) throw new PipelineError("The video could not be rendered.");
@@ -109,33 +112,71 @@ async function writeWithOpus(
 ): Promise<string | null> {
   if (!config.ANTHROPIC_API_KEY) return null;
   const writer = new CompositionWriter(lesson, voice, audio);
+  // Model output → safe, voiced, iconised HTML with the backend's finishing layer.
+  const clean = (raw: string) => {
+    const { html, missing } = inlineIcons(ensureVoiceTrack(sanitizeComposition(raw), voice.file, voice.duration));
+    const iconProblems = missing.map(
+      (n) => `[warning] unknown_icon: data-icon="${n}" is not a Lucide icon name, so it was dropped. Use another Lucide name.`,
+    );
+    return { html: addFinishingLayer(html, voice.duration), iconProblems };
+  };
+  const index = path.join(workDir, "index.html");
+  let html: string;
   try {
-    const clean = (raw: string) => ensureVoiceTrack(sanitizeComposition(raw), voice.file, voice.duration);
-    let html = clean(await writer.draft());
+    let draft = clean(await writer.draft());
     for (let round = 0; ; round++) {
-      await writeFile(path.join(workDir, "index.html"), html);
+      await writeFile(index, draft.html);
       await cb.stage("checking");
-      const { blocking, problems } = await check(workDir);
+      const result = await check(workDir);
+      const problems = [...draft.iconProblems, ...result.problems];
       if (problems.length === 0 || round >= config.HYPERFRAMES_FIX_ROUNDS) {
         // Quality findings (contrast, layout) that survived the fixes are accepted;
-        // code that breaks the render (lint/runtime errors) sends us to the fallback template.
-        if (blocking > 0) {
+        // JS errors at runtime send us to the fallback template.
+        if (result.blocking > 0) {
           console.warn("[hyperframes] composition still breaks after fixes:", problems.filter((p) => p.startsWith("[error]")).slice(0, 5));
-          await writeFile(path.join(workDir, "opus-rejected.html"), html); // kept for debugging
+          await writeFile(path.join(workDir, "opus-rejected.html"), draft.html); // kept for debugging
           return null;
         }
         const left = problems.filter((p) => p.startsWith("[error]"));
         if (left.length) console.warn(`[hyperframes] rendering Opus composition with ${left.length} non-blocking error(s):`, left.slice(0, 3));
-        return html;
+        html = draft.html;
+        break;
       }
       await cb.stage("writing");
-      html = clean(await writer.fix(problems));
+      draft = clean(await writer.fix(problems));
     }
   } catch (err) {
     if (err instanceof ComposeError) console.warn("[hyperframes] composition step failed:", err.message);
     else console.error("[hyperframes] composition step failed:", err);
     return null;
   }
+
+  // Visual review: the model looks at phone-size frames of its own render and fixes what it sees.
+  // A revision that breaks (JS errors) is discarded and the checked version is kept.
+  if (config.HYPERFRAMES_REVIEW) {
+    try {
+      await cb.stage("reviewing");
+      const frames = await captureFrames(workDir, reviewTimes(voice));
+      const revised = frames.length ? await writer.review(frames) : null;
+      if (revised) {
+        const next = clean(revised);
+        await writeFile(index, next.html);
+        await cb.stage("checking");
+        const result = await check(workDir);
+        if (result.blocking === 0) html = next.html;
+        else {
+          console.warn("[hyperframes] review revision breaks, keeping the checked version");
+          await writeFile(index, html);
+        }
+      } else if (frames.length) {
+        console.log("[hyperframes] review: approved as is");
+      }
+    } catch (err) {
+      console.warn("[hyperframes] review step failed, keeping the checked version:", err instanceof Error ? err.message : err);
+      await writeFile(index, html);
+    }
+  }
+  return html;
 }
 
 interface Finding {

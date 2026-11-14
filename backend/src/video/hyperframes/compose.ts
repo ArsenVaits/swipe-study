@@ -40,7 +40,35 @@ export class CompositionWriter {
     return this.ask();
   }
 
-  private async ask(): Promise<string> {
+  /**
+   * Shows Opus phone-size frames of its own render and asks for a harsh visual review.
+   * Returns the corrected HTML, or null when it approves the video as is.
+   */
+  async review(frames: Array<{ time: number; data: string }>): Promise<string | null> {
+    const content: Anthropic.Beta.BetaContentBlockParam[] = [
+      {
+        type: "text",
+        text:
+          "Here are frames of your composition as rendered, at phone size, in time order. Review them as a harsh motion director " +
+          "for a premium explainer channel: is every frame instantly readable on a phone, is there one clear hero per frame, do the " +
+          "frames together tell the idea, is anything cramped, overlapping, cut off, too small, empty, off-look or cheap-looking " +
+          "(clutter, too many effects, random colours)? First list each real problem as one line: `t=… · where · problem → exact change`. " +
+          "If there are problems that matter, reply after the list with the complete corrected HTML document. " +
+          "If the video is already clean and premium, reply with the single word APPROVED and nothing else.",
+      },
+    ];
+    for (const f of frames) {
+      content.push({ type: "text", text: `t=${f.time.toFixed(1)} s` });
+      content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: f.data } });
+    }
+    this.messages.push({ role: "user", content });
+    const reply = await this.ask({ allowNoHtml: true });
+    return reply;
+  }
+
+  private async ask(opts: { allowNoHtml: true }): Promise<string | null>;
+  private async ask(opts?: { allowNoHtml?: false }): Promise<string>;
+  private async ask(opts: { allowNoHtml?: boolean } = {}): Promise<string | null> {
     let response: Anthropic.Beta.BetaMessage;
     try {
       // Streaming: a full composition is a long output, and streaming avoids HTTP timeouts.
@@ -61,7 +89,7 @@ export class CompositionWriter {
       throw new ComposeError("Opus request failed");
     }
 
-    logUsage(this.messages.length > 1 ? "compose-fix" : "compose", response);
+    logUsage(opts.allowNoHtml ? "compose-review" : this.messages.length > 1 ? "compose-fix" : "compose", response);
     if (response.stop_reason === "refusal") throw new ComposeError("Opus declined to write the composition");
     if (response.stop_reason === "max_tokens") throw new ComposeError("Composition was cut off (max_tokens)");
 
@@ -70,7 +98,13 @@ export class CompositionWriter {
       .map((b) => b.text)
       .join("");
     const html = extractHtml(text);
-    if (!html) throw new ComposeError("Opus reply contained no HTML document");
+    if (!html) {
+      if (opts.allowNoHtml) {
+        this.messages.push({ role: "assistant", content: response.content });
+        return null; // approved as is
+      }
+      throw new ComposeError("Opus reply contained no HTML document");
+    }
 
     // Keep the full assistant turn (thinking included) so the fix round continues the same reasoning.
     this.messages.push({ role: "assistant", content: response.content });
