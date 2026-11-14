@@ -1,5 +1,6 @@
 import express from "express";
 import { config } from "./config.ts";
+import { deploymentIdentity } from "./deployment.ts";
 import { errorHandler } from "./http/errors.ts";
 import { PUBLIC_DIR } from "./paths.ts";
 import { lessonJobsRouter } from "./routes/lessonJobs.ts";
@@ -28,11 +29,21 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: "100kb" }));
 
 app.get("/api/health", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   res.json({
     ok: true,
     videoProvider: videoProvider.name,
     lessonAi: config.ANTHROPIC_API_KEY ? "configured" : "missing_key",
+    revision: deploymentIdentity?.split(" ")[0] ?? null,
   });
+});
+app.get("/api/deployment", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!deploymentIdentity) {
+    res.status(503).json({ error: "Deployment identity is unavailable." });
+    return;
+  }
+  res.type("text/plain").send(deploymentIdentity + "\n");
 });
 app.use("/api/lesson-jobs", lessonJobsRouter);
 app.use("/api", (_req, res) => {

@@ -1,19 +1,22 @@
 # ScrollEd backend (MVP)
 
-Node 22.6+ (tested on 26) · TypeScript run natively by Node · Express 5 · Zod · SQLite (`node:sqlite`, a file in `data/`).
+Production: Node 24.22.3 (pinned in `.node-version`) · TypeScript run natively by Node · Express 5 · Zod · SQLite (`node:sqlite`, a file in `data/`).
 
 ## Run
 
 ```bash
 cd backend
-npm install
+npm ci
 cp .env.example .env      # set ANTHROPIC_API_KEY
 # put the demo clip at public/demo/lesson.mp4
 npm run dev               # http://localhost:3001
 npm run typecheck
+npm test               # isolated real-server API and SQLite persistence tests
 ```
 
 Health check: `GET /api/health` → `{ ok, videoProvider, lessonAi }`.
+
+Production auto-deployment runs on every push to `main` through **Deploy backend** in GitHub Actions. `GET /api/health` includes the running `revision`; `GET /api/deployment` returns the exact commit and release identity. Environment files and SQLite stay outside releases. Setup, logs, and rollback commands: [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
 Switch to real video: `VIDEO_PROVIDER=ltx` + `LTX_API_KEY=...`, restart. The frontend contract does not change.
 

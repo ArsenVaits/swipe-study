@@ -1,0 +1,12 @@
+# Installed as ~/.config/scrolled/backend-deploy.conf (mode 600).
+# Values verified from the existing scrolled-backend.service on vaits.
+DEPLOY_ROOT='/home/arsenvaits/scrolled/backend-deploy'
+CURRENT_PATH='/home/arsenvaits/scrolled/backend-current'
+SERVICE='scrolled-backend.service'
+NODE_BIN_DIR='/home/arsenvaits/scrolled/runtime/node/bin'
+NODE_VERSION='v24.22.3'
+ENV_DIR='/home/arsenvaits/scrolled'
+ENV_FILE='/home/arsenvaits/scrolled/backend.env'
+DATABASE_PATH='/home/arsenvaits/scrolled/data/scrolled.db'
+HEALTH_URL='http://127.0.0.1:3001'
+HEALTH_HOST=''

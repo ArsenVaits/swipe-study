@@ -8,6 +8,7 @@ import io
 import os
 from pathlib import Path
 import secrets
+import sqlite3
 import subprocess
 import tarfile
 import tempfile
@@ -23,8 +24,13 @@ root = pathlib.Path(os.environ["TEST_ROOT"])
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 current = (root / "current").resolve()
+component = os.environ.get("TEST_COMPONENT", "frontend")
+service = "existing-" + component + ".service"
 if name == "node":
-    print("v24.0.0")
+    if args == ["--version"]:
+        print("v24.0.0")
+    else:
+        print((root / "backend.env").read_text().strip().split("=", 1)[1])
 elif name == "npm":
     if args == ["--version"]:
         print("11.0.0")
@@ -33,16 +39,26 @@ elif name == "npm":
             sys.exit(1)
         pathlib.Path(".next").mkdir()
         pathlib.Path(".next/BUILD_ID").write_text("test-build")
+    elif args == ["run", "typecheck"] and (root / "fail-build").exists():
+        sys.exit(1)
 elif name == "sudo":
     if "-l" in args:
-        sys.exit(1 if (root / "fail-sudo").exists() else 0)
+        if (root / "fail-sudo").exists():
+            print("    (ALL : ALL) ALL")
+        else:
+            print("    (root) NOPASSWD: " + str(root / "bin/systemctl") + " restart " + service)
+        sys.exit(0)
     sys.exit(subprocess.call(args[1:]))
 elif name == "systemctl":
     if "--property=LoadState" in args:
         print("loaded")
     elif "--property=WorkingDirectory" in args:
         print(root / ("wrong" if (root / "wrong-service").exists() else "current"))
+    elif "--property=EnvironmentFiles" in args:
+        print(str(root / "backend.env") + " (ignore_errors=no)")
     elif args[0] == "restart":
+        if args[1] != service:
+            raise SystemExit("Wrong service restart")
         with (root / "restarts").open("a") as f:
             f.write(str(current) + "\n")
         if (current / "fail-restart").exists():
@@ -52,8 +68,11 @@ elif name == "curl":
         sys.exit(22)
     if "--write-out" in args:
         print("200", end="")
+    elif "/api/health" in args[-1]:
+        print('{"ok": true}')
     else:
-        print((current / "public/__deployment.txt").read_text(), end="")
+        marker = ".deployment-revision" if component == "backend" else "public/__deployment.txt"
+        print((current / marker).read_text(), end="")
 elif name == "sleep":
     pass
 else:
@@ -62,6 +81,8 @@ else:
 
 
 class ReleaseTests(unittest.TestCase):
+    component = "frontend"
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="scrolled-test-")
         self.addCleanup(self.temp.cleanup)
@@ -87,17 +108,26 @@ class ReleaseTests(unittest.TestCase):
         self.config.write_text(
             f"DEPLOY_ROOT='{self.deploy}'\nCURRENT_PATH='{self.current}'\n"
             f"ENV_DIR='{self.env_dir}'\nNODE_BIN_DIR='{self.bin}'\n"
-            "NODE_VERSION='v24.0.0'\nSERVICE='existing-frontend.service'\n"
+            f"NODE_VERSION='v24.0.0'\nSERVICE='existing-{self.component}.service'\n"
             "HEALTH_URL='http://127.0.0.1'\n"
         )
-        self.environment = dict(os.environ, TEST_ROOT=str(self.root),
+        self.environment = dict(os.environ, TEST_ROOT=str(self.root), TEST_COMPONENT=self.component,
                                 SCROLLED_DEPLOY_CONFIG=str(self.config))
+        if self.component == "backend":
+            self.database = self.root / "production.db"
+            with sqlite3.connect(self.database) as connection:
+                connection.execute("CREATE TABLE sentinel (value TEXT)")
+                connection.execute("INSERT INTO sentinel VALUES ('preserved')")
+            self.env_file = self.root / "backend.env"
+            self.env_file.write_text(f"DATABASE_PATH={self.database}\n")
+            with self.config.open("a") as config:
+                config.write(f"ENV_FILE='{self.env_file}'\nDATABASE_PATH='{self.database}'\n")
         self.upload = Path("/tmp/scrolled-upload." + secrets.token_hex(12))
         self.upload.mkdir(mode=0o700)
         self.addCleanup(lambda: self.upload.rmdir())
 
     def archive(self, extra=None):
-        archive = self.upload / "frontend.tar.gz"
+        archive = self.upload / f"{self.component}.tar.gz"
         self.addCleanup(lambda: archive.unlink(missing_ok=True))
         files = {"package.json": "{}", "package-lock.json": "{}", ".node-version": "24.0.0\n"}
         files.update(extra or {})
@@ -110,11 +140,16 @@ class ReleaseTests(unittest.TestCase):
         return str(archive), hashlib.sha256(archive.read_bytes()).hexdigest()
 
     def run_script(self, *args, success):
-        result = subprocess.run(["bash", str(SCRIPT), *args], env=self.environment,
+        component = ["backend"] if self.component == "backend" else []
+        result = subprocess.run(["bash", str(SCRIPT), *component, *args], env=self.environment,
                                 text=True, capture_output=True, timeout=15)
         self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
         self.assertEqual((self.baseline / "keep.txt").read_text(), "original production files")
         self.assertEqual((self.env_dir / ".env.production").read_text(), "SECRET=preserved\n")
+        if self.component == "backend":
+            with sqlite3.connect(self.database) as connection:
+                self.assertEqual(connection.execute("SELECT value FROM sentinel").fetchall(), [("preserved",)])
+            self.assertEqual(self.env_file.read_text(), f"DATABASE_PATH={self.database}\n")
         return result
 
     def test_success_then_manual_rollback(self):
@@ -122,8 +157,14 @@ class ReleaseTests(unittest.TestCase):
         release = self.deploy / "releases" / RELEASE
         self.assertEqual(self.current.resolve(), release)
         self.assertEqual((self.deploy / "previous").resolve(), self.baseline)
-        self.assertTrue((release / ".env.production").is_symlink())
-        self.assertEqual((release / "public/__deployment.txt").read_text(), f"{SHA} {RELEASE}\n")
+        if self.component == "frontend":
+            self.assertTrue((release / ".env.production").is_symlink())
+            self.assertEqual((release / "public/__deployment.txt").read_text(), f"{SHA} {RELEASE}\n")
+        else:
+            backup = self.deploy / "backups" / f"{RELEASE}.sqlite3"
+            with sqlite3.connect(backup) as connection:
+                self.assertEqual(connection.execute("SELECT value FROM sentinel").fetchall(), [("preserved",)])
+            self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
         self.run_script("rollback", RELEASE, success=True)
         self.assertEqual(self.current.resolve(), self.baseline)
 
@@ -189,6 +230,24 @@ class ReleaseTests(unittest.TestCase):
         (self.current / "fail-health").touch()
         self.run_script("rollback", success=True)
         self.assertEqual(self.current.resolve(), self.baseline)
+
+
+class BackendReleaseTests(ReleaseTests):
+    component = "backend"
+
+    def test_mismatched_database_never_switches(self):
+        self.env_file.write_text("DATABASE_PATH=/tmp/wrong.db\n")
+        result = subprocess.run(["bash", str(SCRIPT), "backend", "deploy", RELEASE, SHA,
+                                 *self.archive()], env=self.environment, text=True,
+                                capture_output=True, timeout=15)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preserved database", result.stderr)
+        self.assertEqual(self.current.resolve(), self.baseline)
+
+    def test_archive_cannot_ship_database(self):
+        self.run_script("deploy", RELEASE, SHA,
+                        *self.archive({"data/scrolled.db": "bad"}), success=False)
+        self.assertFalse((self.deploy / "releases" / RELEASE).exists())
 
 
 if __name__ == "__main__":

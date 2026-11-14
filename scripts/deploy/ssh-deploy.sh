@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
+component=${1:-frontend}
+[[ $component == frontend || $component == backend ]] || { echo 'Use frontend or backend' >&2; exit 1; }
+remote_component=''
+health_path=/
+revision_path=/__deployment.txt
+if [[ $component == backend ]]; then
+  remote_component=backend
+  health_path=/api/health
+  revision_path=/api/deployment
+fi
 
 for name in DEPLOY_HOST DEPLOY_PORT DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS GITHUB_SHA GITHUB_RUN_ID GITHUB_RUN_ATTEMPT; do
   [[ -n ${!name:-} ]] || { echo "::error::Missing $name" >&2; exit 1; }
@@ -38,18 +48,18 @@ ssh-keygen -y -P '' -f "$local_tmp/key" > /dev/null
 ssh-keygen -F "[$DEPLOY_HOST]:$DEPLOY_PORT" -f "$local_tmp/known_hosts" > /dev/null
 
 # No git credentials or production env files are needed on the server.
-git archive --format=tar "$GITHUB_SHA:frontend" | gzip > "$local_tmp/frontend.tar.gz"
-checksum=$(sha256sum "$local_tmp/frontend.tar.gz")
+git archive --format=tar "$GITHUB_SHA:$component" | gzip > "$local_tmp/$component.tar.gz"
+checksum=$(sha256sum "$local_tmp/$component.tar.gz")
 checksum=${checksum%% *}
 remote_tmp=$(ssh "${ssh_opts[@]}" "$target" 'umask 077; mktemp -d /tmp/scrolled-upload.XXXXXXXXXX')
 [[ $remote_tmp =~ ^/tmp/scrolled-upload\.[a-zA-Z0-9]+$ ]]
 scp -P "$DEPLOY_PORT" -i "$local_tmp/key" -o IdentitiesOnly=yes -o BatchMode=yes \
   -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$local_tmp/known_hosts" \
-  -o ConnectTimeout=15 "$local_tmp/frontend.tar.gz" "$target:$remote_tmp/frontend.tar.gz"
+  -o ConnectTimeout=15 "$local_tmp/$component.tar.gz" "$target:$remote_tmp/$component.tar.gz"
 # All remote arguments have been restricted to safe characters above.
 # shellcheck disable=SC2029
 ssh "${ssh_opts[@]}" "$target" \
-  "bash -s -- deploy '$release' '$GITHUB_SHA' '$remote_tmp/frontend.tar.gz' '$checksum'" \
+  "bash -s -- $remote_component deploy '$release' '$GITHUB_SHA' '$remote_tmp/$component.tar.gz' '$checksum'" \
   < scripts/deploy/remote.sh
 
 # A failed public check invokes the same locked rollback operation, conditional
@@ -57,18 +67,23 @@ ssh "${ssh_opts[@]}" "$target" \
 public_ok=0
 for attempt in {1..12}; do
   body=$(curl --silent --show-error --fail --connect-timeout 5 --max-time 10 \
-    "http://89.126.195.129/__deployment.txt?release=$release&attempt=$attempt") || body=''
+    "http://89.126.195.129$revision_path?release=$release&attempt=$attempt") || body=''
   if [[ $body == "$GITHUB_SHA $release" ]] && \
       [[ $(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-        --connect-timeout 5 --max-time 10 http://89.126.195.129/) == 200 ]]; then
-    public_ok=1; break
+        --connect-timeout 5 --max-time 10 "http://89.126.195.129$health_path") == 200 ]]; then
+    if [[ $component == frontend ]] || \
+        curl --silent --show-error --fail --connect-timeout 5 --max-time 10 \
+          "http://89.126.195.129$health_path" | \
+          python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ok") is True else 1)'; then
+      public_ok=1; break
+    fi
   fi
   sleep 5
 done
 if [[ $public_ok != 1 ]]; then
   echo '::error::Public health/revision check failed; restoring previous release' >&2
   # shellcheck disable=SC2029
-  ssh "${ssh_opts[@]}" "$target" "bash -s -- rollback '$release'" < scripts/deploy/remote.sh
+  ssh "${ssh_opts[@]}" "$target" "bash -s -- $remote_component rollback '$release'" < scripts/deploy/remote.sh
   exit 1
 fi
-echo "Successfully deployed and publicly verified $GITHUB_SHA ($release)"
+echo "Successfully deployed and publicly verified $component $GITHUB_SHA ($release)"
