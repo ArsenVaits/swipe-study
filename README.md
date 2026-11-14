@@ -4,7 +4,16 @@ ScrollEd is a Next.js, TypeScript, and Tailwind web app with a vertical feed of 
 
 ## Run locally
 
-Start the ScrollEd Express backend on port 3001, then run these commands in this frontend repository:
+Start the ScrollEd Express backend from `backend/` on port 3001 (see [backend/README.md](backend/README.md); the frontend API contract is in [docs/FRONTEND_API.md](docs/FRONTEND_API.md)):
+
+```sh
+cd backend
+npm ci
+cp .env.example .env   # set ANTHROPIC_API_KEY
+npm run dev
+```
+
+Then run these commands in the repository root:
 
 ```sh
 npm ci
