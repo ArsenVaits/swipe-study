@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, Bookmark, Check, ChevronLeft, ChevronRight, CircleHelp, Clapperboard, FileText, Layers3, LoaderCircle, Plus, ShieldCheck, Sparkles, Trash2, Upload, Volume2, X } from "lucide-react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { makeLocalLesson, normalizeText, type Lesson } from "@/lib/lesson";
@@ -51,6 +51,7 @@ export default function Studio() {
   const uploadPanel = useRef<HTMLElement>(null);
   const detailPanel = useRef<HTMLElement>(null);
   const feed = useRef<HTMLDivElement>(null);
+  const requestedShort = useRef<{ id: string; smooth: boolean } | null>(null);
   const currentPdf = useRef<Source | null>(null);
   const clipUrls = useRef<string[]>([]);
   const renderJobs = useRef(new Set<string>());
@@ -72,21 +73,32 @@ export default function Studio() {
   const isSaved = library.some((item) => item.id === entry.id);
   const sourceUrl = entry.sample ? samplePdf : origins.current.get(entry.id);
 
+  useLayoutEffect(() => {
+    const navigation = requestedShort.current;
+    const scroller = feed.current;
+    if (!navigation || !scroller) return;
+    const target = document.getElementById("short-" + navigation.id);
+    if (!target) return;
+    const motion = navigation.smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scroller.scrollTo({ top: target.offsetTop, behavior: motion ? "smooth" : "instant" });
+    if (!motion || Math.abs(scroller.scrollTop - target.offsetTop) < 2) requestedShort.current = null;
+  });
+
   function goTo(id: string, smooth = true) {
+    if (id !== active || !feed.current) requestedShort.current = { id, smooth };
     setActive(id);
     setPanel("quiz");
-    requestAnimationFrame(() => {
-      const scroller = feed.current;
-      const target = document.getElementById("short-" + id);
-      if (!scroller || !target) return;
-      const motion = smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      scroller.scrollTo({ top: target.offsetTop, behavior: motion ? "smooth" : "instant" });
-    });
   }
 
   function onFeedScroll() {
     const scroller = feed.current;
     if (!scroller) return;
+    const navigation = requestedShort.current;
+    if (navigation) {
+      const target = document.getElementById("short-" + navigation.id);
+      if (target && Math.abs(scroller.scrollTop - target.offsetTop) < 2) requestedShort.current = null;
+      return;
+    }
     const next = Math.round(scroller.scrollTop / scroller.clientHeight);
     const id = entries[next]?.id;
     if (id && id !== active) { setActive(id); setPanel("quiz"); }
@@ -190,7 +202,7 @@ export default function Studio() {
     setEntries((previous) => [item, ...previous]);
     goTo(item.id, false);
     void renderClip(item);
-    requestAnimationFrame(() => feed.current?.scrollIntoView({ block: "nearest" }));
+    requestAnimationFrame(() => document.getElementById("lesson-feed")?.scrollIntoView({ block: "nearest" }));
   }
 
   function updateLibrary(next: Entry[], message: string) {
@@ -293,7 +305,7 @@ export default function Studio() {
           <section className="feed-section" aria-labelledby="feed-title" id="lesson-feed">
             <div className="feed-heading"><h2 id="feed-title">Lesson feed</h2><span className="feed-count">{String(index + 1).padStart(2, "0")} <span>/</span> {String(entries.length).padStart(2, "0")}</span></div>
             <div className="feed-layout">
-              <div className="shorts" ref={feed} tabIndex={0} aria-label="Vertical lesson videos" onScroll={onFeedScroll}
+              <div className="shorts" ref={feed} tabIndex={0} aria-label="Vertical lesson videos" onScroll={onFeedScroll} onWheel={() => { requestedShort.current = null; }} onTouchStart={() => { requestedShort.current = null; }}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
                   if (event.key === "ArrowDown" && entries[index + 1]) { event.preventDefault(); goTo(entries[index + 1].id); }

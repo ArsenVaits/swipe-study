@@ -68,6 +68,7 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
   width: calc(var(--feed-height) * .5625);
   position: relative;
   overflow: hidden auto;
+  overflow-anchor: none;
   overscroll-behavior-y: contain;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
