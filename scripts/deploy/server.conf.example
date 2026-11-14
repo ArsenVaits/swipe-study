@@ -1,0 +1,14 @@
+# Install as ~/.config/scrolled/deploy.conf for the deployment account (mode 600).
+# These paths and runtime were verified on vaits on 2026-11-14.
+# This is trusted Bash configuration. Never commit a populated copy with secrets.
+DEPLOY_ROOT='/home/arsenvaits/scrolled/frontend-deploy'
+CURRENT_PATH='/home/arsenvaits/scrolled/current'
+SERVICE='scrolled.service'
+NODE_BIN_DIR='/usr/bin'
+NODE_VERSION='v22.22.1'
+ENV_DIR='/home/arsenvaits/scrolled'
+HEALTH_URL='http://127.0.0.1'
+# If Nginx requires a Host header, set its verified server_name here.
+HEALTH_HOST=''
+# If systemd sets SCROLLED_API_ORIGIN, export the same value for the server build:
+# export SCROLLED_API_ORIGIN='http://127.0.0.1:3001'

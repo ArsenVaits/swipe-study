@@ -1,19 +1,22 @@
 # ScrollEd backend (MVP)
 
-Node 22.6+ (tested on 26) · TypeScript run natively by Node · Express 5 · Zod · SQLite (`node:sqlite`, a file in `data/`).
+Production: Node 24.22.3 (pinned in `.node-version`) · TypeScript run natively by Node · Express 5 · Zod · SQLite (`node:sqlite`, a file in `data/`).
 
 ## Run
 
 ```bash
 cd backend
-npm install
+npm ci
 cp .env.example .env      # set ANTHROPIC_API_KEY
 # put the demo clip at public/demo/lesson.mp4
 npm run dev               # http://localhost:3001
 npm run typecheck
+npm test               # isolated real-server API and SQLite persistence tests
 ```
 
 Health check: `GET /api/health` → `{ ok, videoProvider, lessonAi }`.
+
+Production auto-deployment runs on every push to `main` through **Deploy backend** in GitHub Actions. `GET /api/health` includes the running `revision`; `GET /api/deployment` returns the exact commit and release identity. Environment files and SQLite stay outside releases. Setup, logs, and rollback commands: [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
 Switch video: `VIDEO_PROVIDER=ltx` + `LTX_API_KEY=...`, or `VIDEO_PROVIDER=hyperframes` (see below), restart. The frontend contract does not change.
 
@@ -104,8 +107,8 @@ Pipeline per lesson (runs in the background after `POST` returns; `GET` reports 
    template (`fallback.ts`, kinetic type from the lesson), so a lesson still gets a video.
 5. **Render** (`hyperframes render`, at most `HYPERFRAMES_MAX_PARALLEL_RENDERS` at once) → FFmpeg loudness pass
    (−14 LUFS, −1.5 dBTP, video stream copied) → ffprobe check (H.264, 1080×1920, expected length).
-6. MP4 lands in `data/videos/<id>.mp4`, served at `/api/media/<id>.mp4`. Status lives in
-   `data/hyperframes/<id>.json`; a render cut off by a restart is reported as failed (no auto-retry).
+6. MP4 lands in `<db dir>/videos/<id>.mp4` (next to `DATABASE_PATH`, so it survives deploys), served at
+   `/api/media/<id>.mp4`. Status lives in `<db dir>/hyperframes/<id>.json`; a render cut off by a restart is reported as failed (no auto-retry).
 
 Cost per video: one Opus conversation (draft + fix rounds, prompt-cached system prompt) and the TTS characters
 of the narration; rendering is local CPU (~10–60 s per video on an M-series Mac). Not for serverless hosting

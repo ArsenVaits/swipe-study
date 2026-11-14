@@ -1,3 +1,4 @@
+import path from "node:path";
 import { z } from "zod";
 
 // All configuration is read from server-side env vars only.
@@ -37,8 +38,9 @@ const EnvSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
-  HYPERFRAMES_WORK_DIR: z.string().default("./data/hyperframes"),
-  VIDEO_OUTPUT_DIR: z.string().default("./data/videos"),
+  // Default: next to the database (outside deploy releases), e.g. <db dir>/videos.
+  HYPERFRAMES_WORK_DIR: z.string().optional(),
+  VIDEO_OUTPUT_DIR: z.string().optional(),
   FFMPEG_PATH: z.string().default("ffmpeg"),
   FFPROBE_PATH: z.string().default("ffprobe"),
 
@@ -63,5 +65,10 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const config = parsed.data;
+const dataDir = path.dirname(path.resolve(parsed.data.DATABASE_PATH));
+export const config = {
+  ...parsed.data,
+  HYPERFRAMES_WORK_DIR: path.resolve(parsed.data.HYPERFRAMES_WORK_DIR || path.join(dataDir, "hyperframes")),
+  VIDEO_OUTPUT_DIR: path.resolve(parsed.data.VIDEO_OUTPUT_DIR || path.join(dataDir, "videos")),
+};
 export type Config = typeof config;

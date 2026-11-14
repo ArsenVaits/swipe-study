@@ -1,6 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { config } from "./config.ts";
+import { deploymentIdentity } from "./deployment.ts";
 import { errorHandler } from "./http/errors.ts";
 import { PUBLIC_DIR } from "./paths.ts";
 import { lessonJobsRouter } from "./routes/lessonJobs.ts";
@@ -31,15 +32,25 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: "100kb" }));
 
 app.get("/api/health", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   res.json({
     ok: true,
     videoProvider: videoProvider.name,
     lessonAi: config.ANTHROPIC_API_KEY ? "configured" : "missing_key",
     tts: videoProvider.name === "hyperframes" ? ttsProviderName() : "none",
+    revision: deploymentIdentity?.split(" ")[0] ?? null,
   });
 });
+app.get("/api/deployment", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!deploymentIdentity) {
+    res.status(503).json({ error: "Deployment identity is unavailable." });
+    return;
+  }
+  res.type("text/plain").send(deploymentIdentity + "\n");
+});
 app.use("/api/lesson-jobs", lessonJobsRouter);
-// Finished HyperFrames videos (data/videos/<jobId>.mp4). Range requests are supported for seeking.
+// Finished HyperFrames videos (<db dir>/videos/<jobId>.mp4). Range requests are supported for seeking.
 app.use(
   MEDIA_URL_PREFIX,
   express.static(path.resolve(config.VIDEO_OUTPUT_DIR), { index: false, immutable: true, maxAge: "7d", dotfiles: "deny" }),
