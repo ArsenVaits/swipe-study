@@ -109,8 +109,12 @@ Pipeline per lesson (runs in the background after `POST` returns; `GET` reports 
    Opus for `HYPERFRAMES_FIX_ROUNDS` fix rounds (default 2). JS errors that survive them, or a failed render → built-in
    fallback template (`fallback.ts`, key points from the lesson), so a lesson still gets a video; Opus's HTML is
    then kept as `opus-rejected.html` in the work dir. Leftover lint errors alone don't block the render.
-5. **Art direction**: the prompt fixes four looks (Night Lab, Paper Editorial, Deep Field, Mono Signal: exact
-   palette and fonts) and "expensive and calm" rules (one hero per frame, ≤3 moving elements, ≤3 transition kinds).
+5. **Art direction** (skills in `skills/`, see its README): the model first writes a short DESIGN PLAN grounded in
+   the subject's world (palette, type, one signature device) and checks it against generated-design defaults
+   (frontend-design skill), then builds with showreel direction (type as material, continuity, camera, rhythm:
+   motion-reel skill). Kit: GSAP plugins SplitText, DrawSVG, MorphSVG, MotionPath, CustomEase (loaded and registered
+   by the backend; official reference quoted in the prompt) and 10 OFL display/text fonts with Cyrillic
+   (`assets/fonts`, `@font-face` added for the ones used).
    `<i data-icon="server">` placeholders become inline Lucide icons (`icons.ts`, lucide-static, ISC); the backend
    adds its own finishing layer (`finish.ts`: soft vignette + moving film grain, which also hides H.264 banding).
 6. **Visual review** (`review.ts`, `HYPERFRAMES_REVIEW`): `hyperframes snapshot` captures the thumbnail, one frame

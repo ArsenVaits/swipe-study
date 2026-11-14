@@ -1,3 +1,5 @@
+import { pluginScriptTags } from "./kit.ts";
+
 // The composition is model-written code. It runs only inside headless Chrome during the render,
 // and this pass makes sure it cannot reach the network or load anything but our local GSAP.
 
@@ -12,7 +14,7 @@ const CSP = [
   "form-action 'none'",
 ].join("; ");
 
-const HEAD_INJECT = `<meta http-equiv="Content-Security-Policy" content="${CSP}">\n<script src="assets/gsap.min.js"></script>`;
+const HEAD_INJECT = `<meta http-equiv="Content-Security-Policy" content="${CSP}">\n<script src="assets/gsap.min.js"></script>\n${pluginScriptTags()}`;
 
 /**
  * Makes sure the voiceover is in the mix even if the composition forgot it:
