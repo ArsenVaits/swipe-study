@@ -85,7 +85,7 @@ const sampleMedia = [
   { video: '/sample/practice.mp4', poster: '/sample/practice.webp' }
 ]
 const archive = 'scrolled-library-v1'
-const wheelGestureGap = 180
+const wheelGestureGap = 100
 const wheelThreshold = 30
 const swipeThreshold = 40
 
@@ -107,9 +107,9 @@ export default function Studio() {
   const detailPanel = useRef<HTMLElement>(null)
   const studio = useRef<HTMLElement>(null)
   const feed = useRef<HTMLDivElement>(null)
-  const wheelGesture = useRef({ lastEvent: -Infinity, distance: 0, consumed: false })
+  const wheelGesture = useRef({ lastEvent: -Infinity, direction: 0, distance: 0, consumed: false })
   const touchGesture = useRef<{ id: number; x: number; y: number; consumed: boolean } | null>(null)
-  const requestedShort = useRef<{ id: string; smooth: boolean } | null>(null)
+  const requestedShort = useRef<string | null>(null)
   const currentPdf = useRef<Source | null>(null)
   const clipUrls = useRef<string[]>([])
   const renderJobs = useRef(new Set<string>())
@@ -142,20 +142,17 @@ export default function Studio() {
   const sourceUrl = entry.sample ? samplePdf : origins.current.get(entry.id)
 
   useLayoutEffect(() => {
-    const navigation = requestedShort.current
+    const id = requestedShort.current
     const scroller = feed.current
-    if (!navigation || !scroller) return
-    const target = document.getElementById('short-' + navigation.id)
+    if (!id || !scroller) return
+    const target = document.getElementById('short-' + id)
     if (!target) return
-    const motion =
-      navigation.smooth && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    scroller.scrollTo({ top: target.offsetTop, behavior: motion ? 'smooth' : 'instant' })
-    if (!motion || Math.abs(scroller.scrollTop - target.offsetTop) < 2)
-      requestedShort.current = null
+    scroller.scrollTo({ top: target.offsetTop, behavior: 'instant' })
+    requestedShort.current = null
   })
 
-  const goTo = useCallback((id: string, smooth = true) => {
-    if (id !== active || !feed.current) requestedShort.current = { id, smooth }
+  const goTo = useCallback((id: string) => {
+    if (id !== active || !feed.current) requestedShort.current = id
     setActive(id)
     setPanel('quiz')
   }, [active])
@@ -182,8 +179,10 @@ export default function Studio() {
       const scroller = gestureTarget(event.target, event.clientY)
       if (!scroller) return
 
+      const direction = Math.sign(event.deltaY)
       const gesture = wheelGesture.current
-      if (event.timeStamp - gesture.lastEvent > wheelGestureGap) {
+      if (gesture.direction !== direction || event.timeStamp - gesture.lastEvent > wheelGestureGap) {
+        gesture.direction = direction
         gesture.distance = 0
         gesture.consumed = false
       }
@@ -193,13 +192,11 @@ export default function Studio() {
         return
       }
 
-      const direction = Math.sign(event.deltaY)
       const next = entries[index + direction]
       if (!next) return
 
       event.preventDefault()
       const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? scroller.clientHeight : 1
-      if (Math.sign(gesture.distance) !== direction) gesture.distance = 0
       gesture.distance += event.deltaY * scale
       if (Math.abs(gesture.distance) < wheelThreshold) return
 
@@ -277,13 +274,7 @@ export default function Studio() {
   function onFeedScroll() {
     const scroller = feed.current
     if (!scroller) return
-    const navigation = requestedShort.current
-    if (navigation) {
-      const target = document.getElementById('short-' + navigation.id)
-      if (target && Math.abs(scroller.scrollTop - target.offsetTop) < 2)
-        requestedShort.current = null
-      return
-    }
+    if (requestedShort.current) return
     const next = Math.round(scroller.scrollTop / scroller.clientHeight)
     const id = entries[next]?.id
     if (id && id !== active) {
@@ -439,7 +430,7 @@ export default function Studio() {
       origins.current.set(item.id, source.url)
       setEntries(previous => [item, ...previous])
       setTab('feed')
-      goTo(item.id, false)
+      goTo(item.id)
       void loadVideo(job.jobId, job)
       requestAnimationFrame(() =>
         document.getElementById('lesson-feed')?.scrollIntoView({ block: 'nearest' })
@@ -481,7 +472,7 @@ export default function Studio() {
     }
     if (item.jobId) void loadVideo(item.jobId)
     setTab('feed')
-    goTo(item.id, false)
+    goTo(item.id)
   }
 
   return (
@@ -497,7 +488,7 @@ export default function Studio() {
             aria-label='ScrollEd home'
             onClick={() => {
               setTab('feed')
-              goTo(entries[0].id, false)
+              goTo(entries[0].id)
             }}
           >
             <span className='brand-mark'>
@@ -514,7 +505,7 @@ export default function Studio() {
               aria-current={tab === 'feed' ? 'page' : undefined}
               onClick={() => {
                 setTab('feed')
-                goTo(active, false)
+                goTo(active)
               }}
             >
               <Clapperboard size={16} /> <span>Lesson feed</span>
@@ -595,7 +586,7 @@ export default function Studio() {
                 className='secondary'
                 onClick={() => {
                   setTab('feed')
-                  goTo(active, false)
+                  goTo(active)
                 }}
               >
                 Back to the feed <ArrowRight size={16} />
