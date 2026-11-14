@@ -1,8 +1,11 @@
 import express from "express";
+import path from "node:path";
 import { config } from "./config.ts";
 import { errorHandler } from "./http/errors.ts";
 import { PUBLIC_DIR } from "./paths.ts";
 import { lessonJobsRouter } from "./routes/lessonJobs.ts";
+import { ttsProviderName } from "./tts/index.ts";
+import { MEDIA_URL_PREFIX } from "./video/hyperframes/provider.ts";
 import { videoConfigWarnings, videoProvider } from "./video/index.ts";
 
 const app = express();
@@ -32,9 +35,15 @@ app.get("/api/health", (_req, res) => {
     ok: true,
     videoProvider: videoProvider.name,
     lessonAi: config.ANTHROPIC_API_KEY ? "configured" : "missing_key",
+    tts: videoProvider.name === "hyperframes" ? ttsProviderName() : "none",
   });
 });
 app.use("/api/lesson-jobs", lessonJobsRouter);
+// Finished HyperFrames videos (data/videos/<jobId>.mp4). Range requests are supported for seeking.
+app.use(
+  MEDIA_URL_PREFIX,
+  express.static(path.resolve(config.VIDEO_OUTPUT_DIR), { index: false, immutable: true, maxAge: "7d", dotfiles: "deny" }),
+);
 app.use("/api", (_req, res) => {
   res.status(404).json({ error: { code: "NOT_FOUND", message: "Unknown API route.", details: null }, jobId: null });
 });

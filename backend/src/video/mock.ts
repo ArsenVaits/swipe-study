@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { VideoProvider, VideoStatus } from "./types.ts";
+import type { VideoProvider, VideoStartInput, VideoStatus } from "./types.ts";
 
 /**
  * Mock provider: same lifecycle as a real render (start -> processing -> ready),
@@ -11,6 +11,8 @@ import type { VideoProvider, VideoStatus } from "./types.ts";
 export class MockVideoProvider implements VideoProvider {
   readonly name = "mock" as const;
   readonly minPollIntervalMs = 0;
+  readonly needsLesson = false;
+  readonly maxRenderMs = 15 * 60_000;
   private readonly videoUrl: string;
   private readonly delayMs: number;
   private readonly publicDir: string;
@@ -21,7 +23,7 @@ export class MockVideoProvider implements VideoProvider {
     this.publicDir = opts.publicDir;
   }
 
-  async start(_prompt: string) {
+  async start(_input: VideoStartInput) {
     return { providerJobId: `mock_${Date.now()}_${randomUUID().slice(0, 8)}` };
   }
 

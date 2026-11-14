@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { VideoProviderError, type VideoProvider, type VideoStatus } from "./types.ts";
+import { VideoProviderError, type VideoProvider, type VideoStartInput, type VideoStatus } from "./types.ts";
 
 // LTX async V2 API: https://docs.ltx.io/async-jobs
 //   POST /v2/text-to-video        -> 202 { id, created_at }
@@ -29,6 +29,8 @@ const ErrorBody = z.object({ error: z.object({ type: z.string().optional(), mess
 export class LtxVideoProvider implements VideoProvider {
   readonly name = "ltx" as const;
   readonly minPollIntervalMs = 5000;
+  readonly needsLesson = false;
+  readonly maxRenderMs = 15 * 60_000;
   private readonly apiKey: string | undefined;
 
   constructor(apiKey: string | undefined) {
@@ -42,10 +44,10 @@ export class LtxVideoProvider implements VideoProvider {
     return this.apiKey;
   }
 
-  async start(prompt: string) {
+  async start(input: VideoStartInput) {
     const res = await this.request(BASE_URL, {
       method: "POST",
-      body: JSON.stringify({ prompt, ...RENDER_PARAMS }),
+      body: JSON.stringify({ prompt: input.scenePrompt, ...RENDER_PARAMS }),
     });
     if (res.status !== 202 && res.status !== 200) throw await this.httpError(res, "submit");
     const body = SubmitResponse.safeParse(await res.json().catch(() => null));

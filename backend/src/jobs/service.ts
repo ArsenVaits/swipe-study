@@ -13,9 +13,7 @@ import { ApiError } from "../http/errors.ts";
 import { generateLesson } from "../lessons/generateLesson.ts";
 import type { CreateLessonJobBody } from "../lessons/schema.ts";
 import { videoProvider } from "../video/index.ts";
-import { VideoProviderError } from "../video/types.ts";
-
-const RENDER_TIMEOUT_MS = 15 * 60 * 1000;
+import { VideoProviderError, type VideoStartInput } from "../video/types.ts";
 
 /** Public shape returned to the frontend by both POST and GET. */
 export function toDto(job: JobRecord) {
@@ -49,7 +47,7 @@ export async function createLessonJob(body: CreateLessonJobBody) {
   let videoAttempted = false;
   let videoError: { code: string; message: string } | null = null;
 
-  const startVideo = async (scenePrompt: string): Promise<{ ok: boolean; message: string }> => {
+  const startVideo = async (input: VideoStartInput): Promise<{ ok: boolean; message: string }> => {
     if (videoAttempted) return { ok: false, message: "Video generation was already requested." };
     videoAttempted = true;
 
@@ -57,13 +55,14 @@ export async function createLessonJob(body: CreateLessonJobBody) {
       videoError = { code: "VIDEO_LIMIT_REACHED", message: `Video limit for this session (${config.MAX_VIDEO_JOBS_PER_SESSION}) reached. The lesson is still available.` };
       return { ok: false, message: "Video is not available for this lesson." };
     }
-    if (videoProvider.name === "ltx" && countVideoStartsForProvider("ltx") >= config.MAX_VIDEO_JOBS_TOTAL) {
+    // Paid providers (LTX credits; Opus + TTS for HyperFrames) share a server-wide budget.
+    if (videoProvider.name !== "mock" && countVideoStartsForProvider(videoProvider.name) >= config.MAX_VIDEO_JOBS_TOTAL) {
       videoError = { code: "VIDEO_LIMIT_REACHED", message: "The demo's video budget is used up. The lesson is still available." };
       return { ok: false, message: "Video is not available for this lesson." };
     }
 
     try {
-      const { providerJobId } = await videoProvider.start(scenePrompt);
+      const { providerJobId } = await videoProvider.start(input);
       updateJob(jobId, { videoProvider: videoProvider.name, providerJobId });
       return { ok: true, message: "Video rendering started." };
     } catch (err) {
@@ -78,7 +77,11 @@ export async function createLessonJob(body: CreateLessonJobBody) {
 
   let lesson;
   try {
-    lesson = await generateLesson({ ...body, onStartVideo: startVideo });
+    // Providers that build the video from the finished lesson can't be started mid-generation by a tool call.
+    lesson = await generateLesson({
+      ...body,
+      onStartVideo: videoProvider.needsLesson ? undefined : (scenePrompt) => startVideo({ scenePrompt }),
+    });
   } catch (err) {
     const apiErr =
       err instanceof ApiError ? err : new ApiError(502, "LESSON_GENERATION_FAILED", "Lesson generation failed.");
@@ -89,7 +92,7 @@ export async function createLessonJob(body: CreateLessonJobBody) {
 
   updateJob(jobId, { lesson });
   // Fallback path: tool calling disabled, or Opus skipped the tool → backend starts the render itself.
-  if (!videoAttempted) await startVideo(lesson.scenePrompt);
+  if (!videoAttempted) await startVideo({ scenePrompt: lesson.scenePrompt, lesson });
 
   const err = videoError as { code: string; message: string } | null;
   if (err) {
@@ -127,7 +130,7 @@ async function refreshVideo(job: JobRecord): Promise<void> {
     });
     return;
   }
-  if (Date.now() - job.createdAt > RENDER_TIMEOUT_MS) {
+  if (Date.now() - job.createdAt > videoProvider.maxRenderMs) {
     updateJob(job.id, { status: "failed", error: { stage: "video", code: "VIDEO_TIMEOUT", message: "Video rendering took too long." } });
     return;
   }
