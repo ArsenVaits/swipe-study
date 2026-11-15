@@ -25,3 +25,16 @@ export async function readPage(document: PDFDocumentProxy, pageNumber: number) {
   const content = await page.getTextContent();
   return normalizeText(content.items.map((item) => "str" in item ? item.str : "").join(" "));
 }
+
+/** Text of every page with selectable text, in order, up to `maxChars` in total. */
+export async function readAllPages(document: PDFDocumentProxy, maxChars: number) {
+  const pages: { page: number; text: string }[] = [];
+  let total = 0;
+  for (let n = 1; n <= document.numPages && total < maxChars; n++) {
+    const text = (await readPage(document, n)).slice(0, maxChars - total);
+    if (text.length < 20) continue;
+    pages.push({ page: n, text });
+    total += text.length;
+  }
+  return { pages, total, truncated: total >= maxChars };
+}

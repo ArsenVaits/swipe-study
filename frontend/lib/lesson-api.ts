@@ -92,6 +92,69 @@ export async function pollLessonJob(job: LessonJob, signal: AbortSignal) {
   return current;
 }
 
+export type LessonSetPage = { page: number; text: string };
+
+export type CreateLessonSetRequest = {
+  sourceTitle: string;
+  sessionId: string;
+  pages: LessonSetPage[];
+};
+
+/** One upload → the server plans 1..10 lessons and adds them one by one (see docs/FRONTEND_API.md §3.3). */
+export type LessonSet = {
+  setId: string;
+  status: "planning" | "generating" | "done" | "failed";
+  planned: number | null;
+  titles: string[];
+  lessons: LessonJob[];
+  complete: boolean;
+  error: { code: string; message: string } | null;
+};
+
+async function requestSet(path: string, init: RequestInit, signal: AbortSignal, timeout: number) {
+  const response = await fetch(path, {
+    ...init,
+    cache: "no-store",
+    signal: AbortSignal.any([signal, AbortSignal.timeout(timeout)]),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new LessonApiError(response.status, body?.error?.code);
+  if (!body?.setId || !["planning", "generating", "done", "failed"].includes(body.status) || !Array.isArray(body.lessons)) {
+    throw new Error("Invalid lesson set response");
+  }
+  return body as LessonSet;
+}
+
+export function createLessonSet(input: CreateLessonSetRequest, signal: AbortSignal) {
+  return requestSet("/api/lesson-sets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }, signal, 60_000);
+}
+
+export function getLessonSet(setId: string, signal: AbortSignal) {
+  return requestSet("/api/lesson-sets/" + encodeURIComponent(setId), {}, signal, 15_000);
+}
+
+/** Polls a series until every planned lesson exists and every video is ready or failed. */
+export async function pollLessonSet(set: LessonSet, signal: AbortSignal, onUpdate: (set: LessonSet) => void) {
+  const deadline = Date.now() + 45 * 60_000;
+  let current = set;
+  while (!current.complete && Date.now() < deadline) {
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 3000));
+    signal.throwIfAborted();
+    try {
+      current = await getLessonSet(current.setId, signal);
+      onUpdate(current);
+    } catch (cause) {
+      signal.throwIfAborted();
+      if (cause instanceof LessonApiError && cause.status < 500 && cause.status !== 429) throw cause;
+    }
+  }
+  return current;
+}
+
 export function toLesson(data: ApiLesson): Lesson {
   return {
     title: data.title,
@@ -111,11 +174,12 @@ export function toLesson(data: ApiLesson): Lesson {
 export function lessonErrorMessage(code?: string, status?: number) {
   switch (code) {
     case "VALIDATION_ERROR": return "This passage could not be processed. Check the selection.";
-    case "PAYLOAD_TOO_LARGE": return "Select a shorter passage, up to 12,000 characters.";
+    case "PAYLOAD_TOO_LARGE": return "This PDF is too long. Try a shorter document or a few chapters.";
     case "SESSION_LIMIT_REACHED": return "You have reached the lesson limit for this demo.";
     case "INSUFFICIENT_SOURCE": return "There is not enough material here. Select a longer passage.";
     case "LESSON_REFUSED": return "A lesson could not be created from this passage. Choose another.";
     case "AI_NOT_CONFIGURED": return "Lesson generation is unavailable. Ask the server operator to check the AI configuration.";
+    case "INTERRUPTED": return "The server restarted while making these lessons. The lessons already made are kept.";
     case "LESSON_GENERATION_FAILED":
       return status === 503 ? "Lesson generation is busy. Try again in a minute." : "Lesson generation failed. Try again.";
     default:

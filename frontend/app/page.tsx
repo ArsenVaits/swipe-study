@@ -2,15 +2,18 @@
 
 import type { Lesson } from '@/lib/lesson'
 import {
-  createLessonJob,
+  createLessonSet,
   getLessonJob,
   getSessionId,
   LessonApiError,
   lessonErrorMessage,
   pollLessonJob,
+  pollLessonSet,
   toLesson,
-  type LessonJob
+  type LessonJob,
+  type LessonSet
 } from '@/lib/lesson-api'
+import { placeSeries } from '@/lib/series'
 import {
   sampleLesson,
   sampleName,
@@ -96,6 +99,7 @@ export default function Studio() {
   const [panel, setPanel] = useState<'quiz' | 'source'>('quiz')
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState('')
+  const [progress, setProgress] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [clips, setClips] = useState<Record<string, Clip>>({})
@@ -289,44 +293,89 @@ export default function Studio() {
       document.getElementById('lesson-feed')?.scrollIntoView({ block: 'nearest' })
       return
     }
-    const sourceText = source.text.trim()
-    if (sourceText.length < 80 || sourceText.length > 12_000) {
-      setError('The first page must contain between 80 and 12,000 characters.')
-      return
-    }
     const request = new AbortController()
     creation.current = request
     setCreating(true)
+    const document_ = source
+    // Lessons of this series, in plan order; each is added to the feed the moment it exists.
+    const order: string[] = []
+    const shown = new Set<string>()
+    const apply = (set: LessonSet) => {
+      if (request.signal.aborted) return
+      const fresh: Entry[] = []
+      for (const job of set.lessons) {
+        if (!order.includes(job.jobId)) order.push(job.jobId)
+        if (!job.lesson || shown.has(job.jobId)) continue
+        shown.add(job.jobId)
+        const item: Entry = { id: job.jobId, jobId: job.jobId, lesson: toLesson(job.lesson), name: document_.name }
+        origins.current.set(item.id, document_.url)
+        fresh.push(item)
+      }
+      const ready = set.lessons.filter(job => job.lesson).length
+      setProgress(
+        set.status === 'planning'
+          ? 'Reading your PDF and planning the lessons…'
+          : set.planned
+            ? ready + ' of ' + set.planned + (set.planned === 1 ? ' lesson' : ' lessons') + ' ready. The rest appear in the feed as they finish.'
+            : 'Writing the lessons…'
+      )
+      if (fresh.length) {
+        const first = shown.size === fresh.length
+        setEntries(previous => placeSeries(previous, order.filter(id => shown.has(id)), fresh))
+        updateLibrary(previous => placeSeries(previous, order.filter(id => shown.has(id)), fresh))
+        if (first) {
+          setTab('feed')
+          goTo(fresh[0].id, false)
+          requestAnimationFrame(() =>
+            document.getElementById('lesson-feed')?.scrollIntoView({ block: 'nearest' })
+          )
+        }
+      }
+      // Video state for every lesson of the series comes from the same poll.
+      setClips(previous => {
+        const next = { ...previous }
+        for (const job of set.lessons) {
+          if (!job.lesson || previous[job.jobId]?.video) continue
+          next[job.jobId] =
+            job.status === 'ready' && job.videoUrl
+              ? { video: job.videoUrl }
+              : job.status === 'failed'
+                ? {
+                    error:
+                      job.error?.code === 'VIDEO_LIMIT_REACHED'
+                        ? 'You have reached the video limit for this demo.'
+                        : 'The server could not render this video.'
+                  }
+                : {}
+        }
+        return next
+      })
+    }
     try {
-      const job = await createLessonJob(
+      setProgress('Reading every page of your PDF…')
+      const reader = await import('@/lib/pdf')
+      const { pages, total } = await reader.readAllPages(document_.pdf!, 300_000)
+      if (request.signal.aborted) return
+      if (total < 80) {
+        setError('This PDF has too little selectable text for a lesson.')
+        return
+      }
+      const created = await createLessonSet(
         {
-          sourceTitle: source.name.trim().slice(0, 200) || 'Untitled PDF',
-          sourcePage: source.page,
-          sourceText,
-          sessionId: getSessionId()
+          sourceTitle: document_.name.trim().slice(0, 200) || 'Untitled PDF',
+          sessionId: getSessionId(),
+          pages
         },
         request.signal
       )
+      apply(created)
+      const finished = await pollLessonSet(created, request.signal, apply)
       if (request.signal.aborted) return
-      if (!job.lesson) {
-        setError(lessonErrorMessage(job.error?.code))
-        return
+      if (finished.status === 'failed' && !finished.lessons.some(job => job.lesson)) {
+        setError(lessonErrorMessage(finished.error?.code))
+      } else if (finished.status === 'failed' && finished.error) {
+        setNotice(lessonErrorMessage(finished.error.code))
       }
-      const item: Entry = {
-        id: job.jobId,
-        jobId: job.jobId,
-        lesson: toLesson(job.lesson),
-        name: source.name
-      }
-      origins.current.set(item.id, source.url)
-      setEntries(previous => [item, ...previous])
-      updateLibrary(previous => [item, ...previous.filter(record => record.id !== item.id)])
-      setTab('feed')
-      goTo(item.id, false)
-      void loadVideo(job.jobId, job)
-      requestAnimationFrame(() =>
-        document.getElementById('lesson-feed')?.scrollIntoView({ block: 'nearest' })
-      )
     } catch (cause) {
       if (request.signal.aborted) return
       setError(
@@ -336,7 +385,10 @@ export default function Studio() {
       )
     } finally {
       creation.current = null
-      if (!request.signal.aborted) setCreating(false)
+      if (!request.signal.aborted) {
+        setCreating(false)
+        setProgress('')
+      }
     }
   }
 
@@ -515,7 +567,8 @@ export default function Studio() {
                   Choose a passage.
                 </h1>
                 <p className='editor-description'>
-                  swipe study uses the first page of your PDF to create your lesson.
+                  swipe study reads the whole PDF and makes one to ten short video lessons, depending on
+                  how much there is to learn. Lessons appear in the feed one by one.
                 </p>
                 <div className='document-panel'>
                   <div className='document-name'>
@@ -531,23 +584,23 @@ export default function Studio() {
                     </a>
                   </div>
                 </div>
-                {!source.text && (
+                {!source.text && !source.pdf && (
                   <p className='support-text' role='status'>
-                    The first page has no readable text. Choose a PDF with selectable text.
+                    This PDF has no readable text. Choose a PDF with selectable text.
                   </p>
                 )}
                 <button
                   type='button'
                   className='primary create-button'
-                  disabled={!!busy || creating || !source.text}
+                  disabled={!!busy || creating || (!source.text && !source.pdf)}
                   onClick={() => void createLesson()}
                 >
                   {creating ? <LoaderCircle className='spin' size={18} /> : <Sparkles size={18} />}{' '}
-                  {creating ? 'Creating lesson…' : 'Create my lesson'} <ArrowRight size={16} />
+                  {creating ? 'Creating lessons…' : 'Create my lessons'} <ArrowRight size={16} />
                 </button>
                 {(busy || creating) && (
                   <p role='status' className='support-text'>
-                    {busy || 'Preparing the notes and quiz. This usually takes 10–40 seconds.'}
+                    {busy || progress || 'Reading your PDF and planning the lessons…'}
                   </p>
                 )}
               </>
