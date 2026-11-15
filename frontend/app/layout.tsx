@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/manrope";
+import "@fontsource-variable/geist";
+import "@fontsource-variable/fraunces";
 import "./globals.css";
+import "./discovery.css";
 
 export const metadata: Metadata = {
-  title: "swipe study — PDF to short lessons",
+  title: "simple study — PDF to short lessons",
   description: "Turn a passage from a work PDF into a short lesson, a video recap, and a knowledge check.",
 };
 
