@@ -10,7 +10,7 @@ type Props = { video: string; poster?: string; captions: string[]; title: string
 export default function Player({ video, poster, captions, title, sample, serverVideo, demoVideo, active, onRefresh }: Props) {
   const ref = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(6);
   const [showCaptions, setShowCaptions] = useState(true);
@@ -25,7 +25,13 @@ export default function Player({ video, poster, captions, title, sample, serverV
     if (!media) return;
     if (!active) media.pause();
     else if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      void media.play().catch(() => undefined);
+      // Sound is on by default; if the browser blocks autoplay with sound, start muted instead.
+      media.muted = false;
+      void media.play().catch(() => {
+        media.muted = true;
+        setMuted(true);
+        return media.play();
+      }).catch(() => undefined);
     }
   }, [active, video]);
 
