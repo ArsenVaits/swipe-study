@@ -131,7 +131,10 @@ async function writeWithOpus(
       await cb.stage("checking");
       const result = await check(workDir);
       const problems = [...draft.iconProblems, ...result.problems];
-      if (problems.length === 0 || round >= config.HYPERFRAMES_FIX_ROUNDS) {
+      // A fix round only for real faults (errors or unknown icons). Warnings alone (e.g. near the TikTok
+      // edge) are not worth ~25 s and a full rewrite; the visual review looks at the frames anyway.
+      const faults = problems.filter((p) => p.startsWith("[error]") || p.includes("unknown_icon"));
+      if (faults.length === 0 || round >= config.HYPERFRAMES_FIX_ROUNDS) {
         // Quality findings (contrast, layout) that survived the fixes are accepted;
         // JS errors at runtime send us to the fallback template.
         if (result.blocking > 0) {
@@ -145,7 +148,9 @@ async function writeWithOpus(
         break;
       }
       await cb.stage("writing");
-      draft = clean(await writer.fix(problems));
+      // Faults first, then a few warnings as context.
+      const warnings = problems.filter((p) => !faults.includes(p)).slice(0, 6);
+      draft = clean(await writer.fix([...faults, ...warnings]));
     }
   } catch (err) {
     if (err instanceof ComposeError) console.warn("[hyperframes] composition step failed:", err.message);

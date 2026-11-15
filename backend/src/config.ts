@@ -28,6 +28,8 @@ const EnvSchema = z.object({
   // HyperFrames: Opus writes an HTML+GSAP composition, the HyperFrames CLI renders it to MP4.
   HYPERFRAMES_MODEL: z.string().default("claude-opus-5-5"),
   HYPERFRAMES_EFFORT: z.enum(["low", "medium", "high"]).default("medium"),
+  // Effort for fix rounds and the visual review: targeted edits need less thinking than the first draft.
+  HYPERFRAMES_FIX_EFFORT: z.enum(["low", "medium", "high"]).default("low"),
   HYPERFRAMES_FPS: z.coerce.number().int().min(24).max(60).default(30),
   HYPERFRAMES_QUALITY: z.enum(["draft", "standard", "high"]).default("standard"),
   HYPERFRAMES_MAX_PARALLEL_RENDERS: intFromEnv(1),
