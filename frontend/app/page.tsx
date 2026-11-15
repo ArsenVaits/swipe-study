@@ -44,6 +44,8 @@ import {
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Player from './player'
+import Discovery from './discovery'
+import PublishVideo from './publish-video'
 
 type Source = {
   name: string
@@ -92,7 +94,7 @@ export default function Studio() {
   const [entries, setEntries] = useState<Entry[]>(examples)
   const [active, setActive] = useState(examples[0].id)
   const [library, setLibrary] = useState<Entry[]>([])
-  const [tab, setTab] = useState<'feed' | 'library'>('feed')
+  const [tab, setTab] = useState<'feed' | 'library' | 'saved'>('feed')
   const [panel, setPanel] = useState<'quiz' | 'source'>('quiz')
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState('')
@@ -357,7 +359,7 @@ export default function Studio() {
       previous => isSaved
         ? previous.filter(item => item.id !== entry.id)
         : [entry, ...previous.filter(item => item.id !== entry.id)],
-      isSaved ? 'Lesson removed from your library.' : 'Lesson added to your library.'
+      isSaved ? 'Lesson removed from Saved.' : 'Lesson added to Saved.'
     )
   }
 
@@ -416,6 +418,10 @@ export default function Studio() {
             >
               <Library size={16} /> <span>Library</span>
             </button>
+            <button type='button' aria-current={tab === 'saved' ? 'page' : undefined}
+              onClick={() => { setTab('saved'); setNotice('') }}>
+              <Bookmark size={16} /> <span>Saved</span>
+            </button>
           </nav>
           <button
             type='button'
@@ -442,9 +448,15 @@ export default function Studio() {
         {notice}
       </span>
       {tab === 'library' ? (
-        <main className='library'>
+        <main className='library discovery-library'>
           <h1>Library</h1>
-          <p>Open a video lesson to watch it again or revisit its quiz.</p>
+          <Discovery mode='library' />
+        </main>
+      ) : tab === 'saved' ? (
+        <main className='library'>
+          <h1>Saved</h1>
+          <Discovery mode='saved' />
+          <h2 className='saved-section-title'>Your lessons</h2>
           {library.length ? (
             <ul className='saved-list'>
               {library.map(item => (
@@ -466,7 +478,7 @@ export default function Studio() {
                     onClick={() =>
                       updateLibrary(
                         previous => previous.filter(record => record.id !== item.id),
-                        'Lesson removed from your library.'
+                        'Lesson removed from Saved.'
                       )
                     }
                   >
@@ -478,8 +490,8 @@ export default function Studio() {
           ) : (
             <div className='empty-library'>
               <Library size={30} aria-hidden='true' />
-              <h2>No videos yet</h2>
-              <p>Create a lesson from a PDF or save a lesson from the feed.</p>
+              <h2>No lessons yet</h2>
+              <p>Create a lesson from a PDF or save one from your feed.</p>
               <button
                 type='button'
                 className='secondary'
@@ -701,6 +713,7 @@ export default function Studio() {
                 >
                   <Bookmark size={20} fill={isSaved ? 'currentColor' : 'none'} />
                 </button>
+                {entry.jobId && clips[entry.id]?.video && <PublishVideo key={entry.jobId} jobId={entry.jobId} />}
                 <button
                   type='button'
                   className='rail-button quiz-action'

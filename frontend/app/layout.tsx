@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/manrope";
 import "./globals.css";
+import "./discovery.css";
 
 export const metadata: Metadata = {
   title: "swipe study — PDF to short lessons",

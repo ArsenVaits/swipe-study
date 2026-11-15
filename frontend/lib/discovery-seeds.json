@@ -1,0 +1,74 @@
+[
+  {
+    "id": "ai-prompts",
+    "topic": "AI",
+    "title": "Give AI a better brief",
+    "video": "/discover/ai-prompts.mp4",
+    "poster": "/discover/ai-prompts.webp",
+    "description": "State the goal Add the context and output format. Check the result."
+  },
+  {
+    "id": "ai-grounding",
+    "topic": "AI",
+    "title": "Ground AI answers",
+    "video": "/discover/ai-grounding.mp4",
+    "poster": "/discover/ai-grounding.webp",
+    "description": "Provide a source Ask for a quote with each claim. Check the quote yourself."
+  },
+  {
+    "id": "devops-ci",
+    "topic": "DevOps",
+    "title": "What CI checks",
+    "video": "/discover/devops-ci.mp4",
+    "poster": "/discover/devops-ci.webp",
+    "description": "Push a change Run the build and tests automatically. Fix failures before merging."
+  },
+  {
+    "id": "devops-rollbacks",
+    "topic": "DevOps",
+    "title": "Plan a rollback",
+    "video": "/discover/devops-rollbacks.mp4",
+    "poster": "/discover/devops-rollbacks.webp",
+    "description": "Know the last good release Keep its artifact available. Verify health after rollback."
+  },
+  {
+    "id": "devops-health",
+    "topic": "DevOps",
+    "title": "Health vs. readiness",
+    "video": "/discover/devops-health.mp4",
+    "poster": "/discover/devops-health.webp",
+    "description": "Is it running? Can it take traffic now? Check both separately."
+  },
+  {
+    "id": "focus",
+    "topic": "Productivity",
+    "title": "Make a task startable",
+    "video": "/discover/focus.mp4",
+    "poster": "/discover/focus.webp",
+    "description": "Pick one task Write the next physical action. Make the first step small."
+  },
+  {
+    "id": "handoff",
+    "topic": "Communication",
+    "title": "A clearer handoff",
+    "video": "/discover/handoff.mp4",
+    "poster": "/discover/handoff.webp",
+    "description": "Say what changed Name the owner and open issue. Agree on the next check-in."
+  },
+  {
+    "id": "design-hierarchy",
+    "topic": "Design",
+    "title": "Build visual hierarchy",
+    "video": "/discover/design-hierarchy.mp4",
+    "poster": "/discover/design-hierarchy.webp",
+    "description": "Pick the main action Give it the clearest contrast. Give secondary actions room."
+  },
+  {
+    "id": "design-feedback",
+    "topic": "Design",
+    "title": "Design useful errors",
+    "video": "/discover/design-feedback.mp4",
+    "poster": "/discover/design-feedback.webp",
+    "description": "Say what happened Point to the affected field. Tell people how to recover."
+  }
+]

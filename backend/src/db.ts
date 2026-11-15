@@ -30,6 +30,12 @@ db.exec(`
     updated_at          INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_lesson_jobs_session ON lesson_jobs(session_id);
+  CREATE TABLE IF NOT EXISTS published_videos (
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL UNIQUE,
+    topic TEXT NOT NULL,
+    published_at INTEGER NOT NULL
+  );
 `);
 
 export type JobStatus = "generating_lesson" | "rendering_video" | "ready" | "failed";
@@ -92,6 +98,43 @@ export function insertJob(job: {
 export function getJob(id: string): JobRecord | null {
   const row = db.prepare("SELECT * FROM lesson_jobs WHERE id = ?").get(id) as Row | undefined;
   return row ? fromRow(row) : null;
+}
+
+const publishedVideoQuery = `
+  SELECT p.id, p.topic, p.published_at AS publishedAt,
+         json_extract(j.lesson_json, '$.title') AS title, j.video_url AS video
+  FROM published_videos p JOIN lesson_jobs j ON j.id = p.job_id
+  WHERE j.status = 'ready' AND j.video_url IS NOT NULL
+`;
+
+export function listPublishedVideos() {
+  return db.prepare(publishedVideoQuery + " ORDER BY p.published_at DESC LIMIT 120").all();
+}
+
+export function getPublishedVideo(id: string) {
+  return db.prepare(publishedVideoQuery + " AND p.id = ?").get(id);
+}
+
+export function setVideoPublication(jobId: string, sessionId: string, publicationId: string, topic: string | null) {
+  const job = getJob(jobId);
+  if (!job || job.sessionId !== sessionId) return false;
+  if (topic === null) {
+    db.prepare("DELETE FROM published_videos WHERE job_id = ?").run(jobId);
+    return true;
+  }
+  if (job.status !== "ready" || !job.videoUrl || !job.lesson) return false;
+  db.prepare(`
+    INSERT INTO published_videos (id, job_id, topic, published_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(job_id) DO UPDATE SET topic = excluded.topic
+  `).run(publicationId, jobId, topic, Date.now());
+  return true;
+}
+
+export function getVideoPublication(jobId: string, sessionId: string) {
+  return db.prepare(`
+    SELECT p.topic FROM published_videos p JOIN lesson_jobs j ON j.id = p.job_id
+    WHERE p.job_id = ? AND j.session_id = ?
+  `).get(jobId, sessionId)?.topic ?? null;
 }
 
 export interface JobPatch {
