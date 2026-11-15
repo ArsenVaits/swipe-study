@@ -1,6 +1,6 @@
-# simple study — frontend
+# swipe study — frontend
 
-Next.js, TypeScript, and Tailwind web app with a vertical feed of short lessons. Open a text PDF and select Create my lessons. simple study reads every page (up to 300,000 characters) and sends the text by page, the document title, and an anonymous browser session ID to `POST /api/lesson-sets`. The server decides how many lessons the material deserves (one for single-topic notes, up to ten for a book) and the feed adds them one by one as they are written; each video follows when its render finishes.
+Next.js, TypeScript, and Tailwind web app with a vertical feed of short lessons. Open a text PDF and select Create my lessons. swipe study reads every page (up to 300,000 characters) and sends the text by page, the document title, and an anonymous browser session ID to `POST /api/lesson-sets`. The server decides how many lessons the material deserves (one for single-topic notes, up to ten for a book) and the feed adds them one by one as they are written; each video follows when its render finishes.
 
 The API contract is described in [../docs/FRONTEND_API.md](../docs/FRONTEND_API.md).
 

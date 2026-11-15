@@ -23,13 +23,13 @@ const lessons = [
 ]
 
 const faqs = [
-  ['What does simple study do?', 'simple study reads a text-based PDF and turns it into short videos with captions and a quiz for each lesson.'],
+  ['What does swipe study do?', 'swipe study reads a text-based PDF and turns it into short videos with captions and a quiz for each lesson.'],
   ['Can I try it with my own PDF?', 'Yes. Open the studio and drop in a PDF with selectable text. You can also try the included feedback guide.'],
   ['Can I watch without uploading anything?', 'Yes. Open the Library and choose a topic. Select a clip to watch it full-screen, then swipe or scroll to the next one.'],
   ['How do I find a topic?', 'Type a topic in the Library search field. English and Russian topic keywords are supported.'],
   ['Can I check where a lesson came from?', 'The source tab shows the quote and source page. While the uploaded file is open, you can jump back to that page.'],
   ['Where do saved lessons go?', 'Open Saved to find lessons you made and clips you bookmarked in this browser.'],
-  ['What happens to my PDF?', 'The file stays in your browser. simple study sends its extracted text to the server to create the lessons and render the videos.'],
+  ['What happens to my PDF?', 'The file stays in your browser. swipe study sends its extracted text to the server to create the lessons and render the videos.'],
   ['Do I need an account?', 'You can use the studio, Library and Saved as soon as you open the local preview.'],
 ]
 
@@ -46,9 +46,9 @@ type Clip = typeof seeds[number]
 type Dialog = { type: 'guide' } | { type: 'clip'; clip: Clip }
 
 function Wordmark() {
-  return <a className="ms-wordmark" href="/" aria-label="simple study home">
+  return <a className="ms-wordmark" href="/" aria-label="swipe study home">
     <span><Layers3 size={18} strokeWidth={2.5} /></span>
-    <strong>simple <span>study</span></strong>
+    <strong>swipe <span>study</span></strong>
   </a>
 }
 
@@ -79,7 +79,7 @@ function Header() {
 
   return <>
     {announced && <div className="ms-announcement">
-      Explore simple study. Your first lesson is ready to watch. <a href="/studio#lesson-feed">Try the demo</a>
+      Explore swipe study. Your first lesson is ready to watch. <a href="/studio#lesson-feed">Try the demo</a>
       <button aria-label="Close announcement" onClick={() => {
         sessionStorage.setItem('scrolled-motion-announcement', 'closed')
         setAnnounced(false)
@@ -145,7 +145,7 @@ function Hero() {
   }, [])
 
   return <section className="ms-hero">
-    <h1>Meet <span>simple study,</span></h1>
+    <h1>Meet <span>swipe study,</span></h1>
     <p>Turn a work PDF into short video lessons and quick quizzes.</p>
     <div className="ms-hero-actions">
       <a className="ms-button ms-silver" href="/studio"><Play size={13} fill="currentColor" /> Start learning</a>
@@ -260,7 +260,7 @@ function Showcase({ onOpen }: { onOpen: (clip: Clip) => void }) {
 
   return <section id="showcase" className="ms-showcase">
     <div className="ms-section-heading ms-centered">
-      <h2>Made with simple study</h2>
+      <h2>Made with swipe study</h2>
       <p>One idea per video. Explore short lessons from the library.</p>
       <a className="ms-button ms-outline" href={library}>Browse topics <ArrowRight size={18} /></a>
     </div>
@@ -313,7 +313,7 @@ function Features() {
       <div className="ms-kit-pair">
         <a className="ms-kit-box ms-tile" href={library}>
           <img src="/motion/package/box.webp" alt="" loading="lazy" />
-          <div><strong>simple study Library</strong><i aria-hidden="true" /></div>
+          <div><strong>swipe study Library</strong><i aria-hidden="true" /></div>
         </a>
         <dl className="ms-stats ms-tile">
           {[[11, 'Topics'], [seeds.length, 'Library videos'], [2, 'Sample lessons'], ['9:16', 'Video format'], [1, 'Question per lesson'], ['PDF', 'Source material']].map(([quantity, label]) => (
@@ -343,7 +343,7 @@ function Footer() {
       <div><h2>Product</h2><a href="/studio">Studio</a><a href="/studio?view=saved">Saved</a><a href="#features">Features</a></div>
       <div><h2>Library</h2><a href={library}>All topics</a><a href={library + '&topic=Programming'}>Programming</a><a href={library + '&topic=AI'}>AI</a></div>
       <div><h2>Support</h2><a href="#workflow">How it works</a><a href="#faq">FAQ</a></div>
-      <p className="ms-footer-note">simple study</p>
+      <p className="ms-footer-note">swipe study</p>
     </div>
   </footer>
 }
@@ -437,7 +437,7 @@ export default function MotionHome() {
         <span className="ms-tip-copy"><strong>Not sure where to start?</strong><span>See how to make your first lesson.</span><b>Watch the example →</b></span>
       </button>
     </aside>}
-    <dialog ref={dialog} className="ms-dialog" aria-label={content?.type === 'clip' ? content.clip.title : 'How simple study works'}
+    <dialog ref={dialog} className="ms-dialog" aria-label={content?.type === 'clip' ? content.clip.title : 'How swipe study works'}
       onClose={() => setContent(null)}
       onClick={event => { if (event.target === event.currentTarget) event.currentTarget.close() }}>
       {content && <div className="ms-dialog-content">

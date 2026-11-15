@@ -520,9 +520,9 @@ export default function Studio({
       </a>
       <header className='site-header'>
         <div className='header-inner'>
-          <a className='wordmark' href='/' aria-label='simple study home'>
+          <a className='wordmark' href='/' aria-label='swipe study home'>
             <span className='brand-mark'><Layers3 size={18} strokeWidth={2.4} /></span>
-            <span>simple <span className='brand-study'>study</span></span>
+            <span>swipe <span className='brand-study'>study</span></span>
           </a>
           <nav aria-label='Main navigation'>
             <button
@@ -656,7 +656,7 @@ export default function Studio({
                   Your PDF is ready.
                 </h1>
                 <p className='editor-description'>
-                  simple study reads the whole PDF and makes one to ten short video lessons, depending on
+                  swipe study reads the whole PDF and makes one to ten short video lessons, depending on
                   how much there is to learn. Lessons appear in the feed one by one.
                 </p>
                 <div className='document-panel'>

@@ -427,7 +427,7 @@ a.ms-tile:hover img { transform: scale(1.04); }
 .ms-footer {
   border-top: 1px solid var(--ms-line);
   padding: 60px 24px clamp(110px, 25vw, 360px);
-  background: linear-gradient(#000 18%, #0007 75%), url('/motion/footer.webp') bottom center / 100% auto no-repeat;
+  background: linear-gradient(#000 18%, #0007 75%), url('/motion/footer-swipe-study.webp') bottom center / 100% auto no-repeat;
 }
 .ms-footer-inner { width: min(100%, 1104px); margin: auto; display: grid; grid-template-columns: 2fr repeat(3, minmax(0, 1fr)); gap: 24px; }
 .ms-footer-brand p { color: var(--ms-muted); max-width: 33ch; margin: 16px 0; }
