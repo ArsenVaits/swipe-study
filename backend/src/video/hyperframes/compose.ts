@@ -4,6 +4,7 @@ import { logUsage } from "../../lessons/generateLesson.ts";
 import type { Lesson } from "../../lessons/schema.ts";
 import type { Voiceover } from "../../tts/index.ts";
 import { composeSystemPrompt } from "./prompt.ts";
+import { applyEdits, EDIT_FORMAT_HELP, parseEdits } from "./edits.ts";
 import { extractHtml } from "./sanitize.ts";
 
 // API key is read by the SDK from ANTHROPIC_API_KEY (server env only).
@@ -19,31 +20,49 @@ export interface AudioAssets {
   sfx: string[];
 }
 
-/** One conversation with Opus: the first draft, then fixes for what `hyperframes check` found. */
+/** Result of a fix or review turn: the new raw document, or null when nothing changed. */
+interface Revision {
+  raw: string | null;
+  approved: boolean;
+}
+
+/**
+ * One conversation with the model: the first draft as a full document, then fix and review
+ * rounds answered with small find/replace edits applied to the model's own last document.
+ */
 export class CompositionWriter {
   private readonly messages: Anthropic.Beta.BetaMessageParam[] = [];
+  /** The model's current document (before our sanitizing/icons/finishing), which its edits refer to. */
+  private raw = "";
 
   constructor(lesson: Lesson, voice: Voiceover, audio: AudioAssets) {
     this.messages.push({ role: "user", content: briefFor(lesson, voice, audio) });
   }
 
   async draft(): Promise<string> {
-    return this.ask();
+    const { text } = await this.ask("compose", config.HYPERFRAMES_EFFORT);
+    const html = extractHtml(text);
+    if (!html) throw new ComposeError("Opus reply contained no HTML document");
+    this.raw = html;
+    return html;
   }
 
-  async fix(problems: string[]): Promise<string> {
+  /** Returns the corrected document, or null when the reply had nothing applicable. */
+  async fix(problems: string[]): Promise<string | null> {
     this.messages.push({
       role: "user",
       content:
         "`hyperframes check` found these problems in your composition:\n" +
         problems.map((p) => `- ${p}`).join("\n") +
-        "\n\nFix all of them and reply with the complete corrected HTML document only.",
+        "\n\nFix all of them. " +
+        EDIT_FORMAT_HELP,
     });
-    return this.ask({ effort: config.HYPERFRAMES_FIX_EFFORT });
+    const rev = await this.revise("compose-fix");
+    return rev.raw;
   }
 
   /**
-   * Shows Opus phone-size frames of its own render and asks for a harsh visual review.
+   * Shows the model phone-size frames of its own render and asks for a harsh visual review.
    * Returns the corrected HTML, or null when it approves the video as is.
    */
   async review(frames: Array<{ time: number; data: string }>): Promise<string | null> {
@@ -57,9 +76,10 @@ export class CompositionWriter {
           "that reads as a slide or a template, any generated-design default from the list in your instructions (cream + serif + " +
           "terracotta, near-black + one acid accent, identical rounded cards, one accented word in a headline, small mono labels, " +
           "everything centred and tiny). P1: no signature device, weak contrast in scale or rhythm, a beat that does not explain its " +
-          "idea at a glance. First list each real problem as one line: `t=… · where · problem → exact change`. " +
-          "If there are problems that matter, reply after the list with the complete corrected HTML document. " +
-          "If the video is already clean and premium, reply with the single word APPROVED and nothing else.",
+          "idea at a glance. First list each real problem as one line: `t=… · where · problem → exact change`, then fix the ones " +
+          "that matter. " +
+          EDIT_FORMAT_HELP +
+          " If the video is already clean and premium, reply with the single word APPROVED and nothing else.",
       },
     ];
     for (const f of frames) {
@@ -67,23 +87,52 @@ export class CompositionWriter {
       content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: f.data } });
     }
     this.messages.push({ role: "user", content });
-    const reply = await this.ask({ allowNoHtml: true, effort: config.HYPERFRAMES_FIX_EFFORT });
-    return reply;
+    const rev = await this.revise("compose-review");
+    return rev.approved ? null : rev.raw;
   }
 
-  private async ask(opts: { allowNoHtml: true; effort?: Effort }): Promise<string | null>;
-  private async ask(opts?: { allowNoHtml?: false; effort?: Effort }): Promise<string>;
-  private async ask(opts: { allowNoHtml?: boolean; effort?: Effort } = {}): Promise<string | null> {
+  /** Applies the reply's edits (or takes a full document) to the current raw document. */
+  private async revise(kind: string): Promise<Revision> {
+    const { text } = await this.ask(kind, config.HYPERFRAMES_FIX_EFFORT);
+    const edits = parseEdits(text);
+    if (edits.length) {
+      const res = applyEdits(this.raw, edits);
+      console.log(`[hyperframes] ${kind}: ${res.applied}/${edits.length} edits applied`);
+      if (res.failed.length) console.warn(`[hyperframes] ${kind}: edits that did not match:`, res.failed);
+      if (res.applied > 0) {
+        this.raw = res.doc;
+        if (res.failed.length) {
+          // Keep the model's picture of its document accurate for the next round.
+          this.messages.push({
+            role: "user",
+            content: `Note: ${res.failed.length} of your edits did not match and were skipped (FIND starting with: ${res.failed.map((f) => JSON.stringify(f)).join(", ")}). The others were applied.`,
+          });
+          this.messages.push({ role: "assistant", content: "Understood." });
+        }
+        return { raw: this.raw, approved: false };
+      }
+    }
+    const html = extractHtml(text);
+    if (html) {
+      this.raw = html;
+      return { raw: html, approved: false };
+    }
+    if (/\bAPPROVED\b/.test(text) && !edits.length) return { raw: null, approved: true };
+    console.warn(`[hyperframes] ${kind}: reply had no applicable edits and no document`);
+    return { raw: null, approved: false };
+  }
+
+  private async ask(kind: string, effort: Effort): Promise<{ text: string }> {
     let response: Anthropic.Beta.BetaMessage;
     try {
-      // Streaming: a full composition is a long output, and streaming avoids HTTP timeouts.
+      // Streaming: the first draft is a long output, and streaming avoids HTTP timeouts.
       response = await client.beta.messages
         .stream({
           model: config.HYPERFRAMES_MODEL,
           max_tokens: 32000,
           system: [{ type: "text", text: composeSystemPrompt(config.HYPERFRAMES_CAPTIONS), cache_control: { type: "ephemeral" } }],
           messages: this.messages,
-          output_config: { effort: opts.effort ?? config.HYPERFRAMES_EFFORT },
+          output_config: { effort },
           betas: ["server-side-fallback-2026-07-01"],
           fallbacks: "default",
         })
@@ -94,26 +143,17 @@ export class CompositionWriter {
       throw new ComposeError("Opus request failed");
     }
 
-    logUsage(opts.allowNoHtml ? "compose-review" : this.messages.length > 1 ? "compose-fix" : "compose", response);
+    logUsage(kind, response);
     if (response.stop_reason === "refusal") throw new ComposeError("Opus declined to write the composition");
     if (response.stop_reason === "max_tokens") throw new ComposeError("Composition was cut off (max_tokens)");
 
+    // Keep the full assistant turn (thinking included) so later rounds continue the same reasoning.
+    this.messages.push({ role: "assistant", content: response.content });
     const text = response.content
       .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
       .map((b) => b.text)
       .join("");
-    const html = extractHtml(text);
-    if (!html) {
-      if (opts.allowNoHtml) {
-        this.messages.push({ role: "assistant", content: response.content });
-        return null; // approved as is
-      }
-      throw new ComposeError("Opus reply contained no HTML document");
-    }
-
-    // Keep the full assistant turn (thinking included) so the fix round continues the same reasoning.
-    this.messages.push({ role: "assistant", content: response.content });
-    return html;
+    return { text };
   }
 }
 
