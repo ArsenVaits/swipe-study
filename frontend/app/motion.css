@@ -171,7 +171,20 @@ html:has(.ms-site) { color-scheme: dark; background: #000; }
 }
 .ms-pill strong { color: #a6aacd; font-weight: 650; white-space: nowrap; }
 .ms-pill:hover { border-color: #9b9fc8; background: #191a23; }
-.ms-hero-art { width: min(100%, 640px, 72vh); margin: 12px auto 0; }
+.ms-hero-art {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 640px, 72vh);
+  margin: 12px auto 0;
+}
+.ms-hero-art::before {
+  content: '';
+  position: absolute;
+  inset: 18% -11% -3%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 58%, #38288642, transparent 68%);
+}
 .ms-hero-cards { display: flex; position: relative; z-index: 2; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .ms-hero-card {
   width: 29.2%;
@@ -179,7 +192,7 @@ html:has(.ms-site) { color-scheme: dark; background: #000; }
   border: 1px solid #333;
   border-radius: clamp(10px, 2vw, 17px);
   overflow: hidden;
-  background: #1b1a19;
+  background: #15131d;
   text-align: left;
   color: #f8f7f1;
   font-family: var(--ms-serif);
@@ -191,38 +204,27 @@ html:has(.ms-site) { color-scheme: dark; background: #000; }
 .ms-hero-card:last-child { transform: translateY(24px) rotate(9deg); }
 .ms-hero-card:hover, .ms-hero-card:focus-visible { transform: translateY(-7px) rotate(0) scale(1.07); border-color: #9b9fc8; z-index: 3; }
 .ms-hero-card > span:last-child { display: block; padding: 5px 10px; white-space: nowrap; }
-.ms-hero-collage {
+.ms-hero-cover {
+  display: block;
+  width: 100%;
   aspect-ratio: 16 / 10;
-  display: grid;
-  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
-  grid-auto-rows: minmax(0, 1fr);
-  overflow: hidden;
-  background: #15151a;
+  object-fit: cover;
+  object-position: center 43%;
 }
-.ms-hero-collage img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.ms-head-chips { display: flex; justify-content: center; gap: 6px; position: relative; z-index: 1; margin: 0 auto -22px; }
-.ms-head-chips span {
-  width: clamp(29px, 9%, 43px);
-  aspect-ratio: 1.28;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  background: linear-gradient(#343330, #080808);
-  border: 1px solid #ffffff0f;
-  border-bottom-color: #ffffff2c;
-  border-radius: 7px;
-  color: #c4c0b8;
-  font-family: var(--ms-serif);
+.ms-film-ribbon {
+  display: block;
+  width: min(94%, 410px);
+  height: auto;
+  margin: -58px auto -3%;
+  pointer-events: none;
 }
-.ms-head-chips span:first-child { transform: rotate(-8deg) translateY(8px); }
-.ms-head-chips span:last-child { transform: rotate(8deg) translateY(8px); }
-.ms-head-chips i { width: 31%; height: 40%; border-radius: 50% 50% 12% 12%; background: #bcb8aa44; transform: translateY(8%); }
-.ms-head-chips i::before { content: ''; display: block; width: 62%; aspect-ratio: 1; border-radius: 50%; background: #bcb8aa77; margin: auto; transform: translateY(-85%); }
-.ms-head { position: relative; width: 58%; margin: 18px auto 0; }
-.ms-head img { display: block; width: 100%; height: auto; }
-.ms-head .ms-head-fallback { position: absolute; inset: 0; }
-.ms-head:has(canvas[data-ready]) .ms-head-fallback { visibility: hidden; }
-.ms-head canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+@media (prefers-reduced-motion: no-preference) {
+  .ms-film-ribbon { animation: ms-ribbon-in .85s ease-out both; }
+}
+@keyframes ms-ribbon-in {
+  from { opacity: .55; transform: translateY(16px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
 
 .ms-section { width: min(100%, 1152px); margin-inline: auto; padding: 80px 24px; }
 .ms-section-heading h2 {
@@ -261,7 +263,7 @@ html:has(.ms-site) { color-scheme: dark; background: #000; }
   left: 50%;
   translate: -50%;
   height: 55%;
-  background: radial-gradient(ellipse at center, #676bb253 0%, transparent 64%);
+  background: radial-gradient(ellipse at center, #4835a55c 0%, transparent 68%);
   pointer-events: none;
 }
 .ms-showcase-card {
@@ -279,21 +281,43 @@ html:has(.ms-site) { color-scheme: dark; background: #000; }
   transition: border-color .3s;
   user-select: none;
 }
-.ms-showcase-card:hover { border-color: #a7abdf; }
-.ms-showcase-card video { pointer-events: none; display: block; width: 100%; height: 100%; object-fit: cover; transition: scale .6s; }
-.ms-showcase-card:hover video { scale: 1.05; }
+.ms-showcase-card:is(:hover, :focus-visible) { border-color: #b1ace3; }
+.ms-showcase-cover {
+  pointer-events: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: scale .6s;
+}
+.ms-showcase-card:is(:hover, :focus-visible) .ms-showcase-cover { scale: 1.045; }
 .ms-showcase-label {
-  position: absolute; inset: auto 0 0;
-  display: flex; align-items: center; gap: 6px;
-  padding: 26px 11px 12px;
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 44px 13px 13px;
   text-align: left;
   color: #fff;
-  font-size: 13px;
-  background: linear-gradient(transparent, #000b);
-  opacity: 0;
-  transition: opacity .23s;
+  background: linear-gradient(transparent, #0b0719e6);
 }
-.ms-showcase-card:is(:hover, :focus-visible) .ms-showcase-label { opacity: 1; }
+.ms-showcase-label small, .ms-showcase-label strong { display: block; }
+.ms-showcase-label small { color: #e7ddfa; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
+.ms-showcase-label strong { font-size: clamp(12px, 1.2vw, 17px); line-height: 1.16; font-weight: 620; margin-top: 3px; }
+.ms-showcase-label i {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid #ffffff46;
+  background: #140f2d73;
+  display: grid;
+  place-items: center;
+  transition: background .2s;
+}
+.ms-showcase-card:is(:hover, :focus-visible) .ms-showcase-label i { background: #6e58b5; }
 
 .ms-feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 48px; }
 .ms-feature-card { position: relative; overflow: hidden; aspect-ratio: 1; background: linear-gradient(#101010 35%, #000 74%); isolation: isolate; }
@@ -472,7 +496,7 @@ a.ms-tile:hover img { transform: scale(1.04); }
   .ms-hero-art { width: calc(100% - 12px); }
   .ms-hero-card { width: 31%; }
   .ms-hero-card > span:last-child { padding-inline: 6px; font-size: clamp(11px, 3.6vw, 15px); }
-  .ms-head { margin-top: 22px; }
+  .ms-film-ribbon { width: min(94%, 350px); margin-top: -12px; }
   .ms-section { padding: 56px 16px; }
   .ms-showcase { padding-top: 64px; padding-bottom: 12px; }
   .ms-ring { height: 300px; }

@@ -8,9 +8,9 @@ import './motion.css'
 
 const library = '/studio?view=library'
 const topics = [
-  { name: 'Programming', collage: ['code-debug', 'code-functions', 'devops-ci', 'devops-rollbacks'] },
-  { name: 'Science', collage: ['science-controls', 'history-sources', 'geo-time'] },
-  { name: 'AI & Design', collage: ['ai-grounding', 'ai-prompts', 'design-feedback', 'design-hierarchy'], topic: 'AI' },
+  { name: 'Programming', cover: 'code-functions' },
+  { name: 'Science', cover: 'science-controls' },
+  { name: 'AI & Design', cover: 'ai-prompts', topic: 'AI' },
 ]
 
 const lessons = [
@@ -121,71 +121,6 @@ function Header() {
   </>
 }
 
-function HeroHead() {
-  const canvas = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    const target = canvas.current
-    const context = target?.getContext('2d')
-    if (!target || !context) return
-
-    const image = new Image()
-    let disposed = false
-    let cleanup = () => {}
-    image.onload = () => {
-      if (disposed) return
-      const source = document.createElement('canvas')
-      source.width = 70
-      source.height = Math.round(source.width * image.height / image.width * .62)
-      const pixels = source.getContext('2d', { willReadFrequently: true })
-      if (!pixels) return
-
-      pixels.drawImage(image, 0, 0, source.width, source.height)
-      const data = pixels.getImageData(0, 0, source.width, source.height).data
-      const stepX = target.width / source.width
-      const stepY = target.height / source.height
-      const chars = '.:+*#%@'
-      const render = (time: number) => {
-        context.clearRect(0, 0, target.width, target.height)
-        context.font = '12px monospace'
-        context.textBaseline = 'top'
-        for (let y = 0; y < source.height; y++) {
-          const scan = time ? Math.sin(y * .41 - time * 1.15) * .09 : 0
-          for (let x = 0; x < source.width; x++) {
-            const offset = (y * source.width + x) * 4
-            const bright = (data[offset] + data[offset + 1] + data[offset + 2]) / 765
-            const density = bright * data[offset + 3] / 255
-            if (density < .065) continue
-            const char = chars[Math.min(chars.length - 1, Math.floor(density * 8))]
-            context.fillStyle = 'rgba(235,235,235,' + Math.min(.98, .2 + density * .9 + scan) + ')'
-            context.fillText(char, x * stepX, y * stepY)
-          }
-        }
-      }
-      render(0)
-      target.dataset.ready = 'true'
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-      let frame = 0
-      const tick = (time: number) => {
-        if (++frame % 3 === 0) render(time)
-      }
-      const observer = new IntersectionObserver(([entry]) => {
-        gsap.ticker.remove(tick)
-        if (entry.isIntersecting) gsap.ticker.add(tick)
-      })
-      observer.observe(target)
-      cleanup = () => { observer.disconnect(); gsap.ticker.remove(tick) }
-    }
-    image.src = '/motion/hero-head-front.png'
-    return () => { disposed = true; cleanup() }
-  }, [])
-
-  return <div className="ms-head" aria-hidden="true">
-    <img src="/motion/hero-head-back.png" alt="" width={681} height={577} />
-    <img className="ms-head-fallback" src="/motion/hero-head-ascii.webp" alt="" width={681} height={577} />
-    <canvas ref={canvas} width={681} height={577} />
-  </div>
-}
-
 function Hero() {
   const stage = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -219,16 +154,11 @@ function Hero() {
     <div className="ms-hero-art" ref={stage}>
       <div className="ms-hero-cards">
         {topics.map(item => <a key={item.name} href={library + '&topic=' + encodeURIComponent(item.topic || item.name)} className="ms-hero-card">
-          <span className="ms-hero-collage" style={{ '--columns': item.collage.length === 3 ? 3 : 2 } as CSSProperties}>
-            {item.collage.map(id => <img key={id} src={'/discover/' + id + '.webp'} alt="" />)}
-          </span>
+          <img className="ms-hero-cover" src={'/motion/covers/' + item.cover + '.webp'} alt="" />
           <span>{item.name}</span>
         </a>)}
       </div>
-      <div className="ms-head-chips" aria-hidden="true">{[0, 1, 2, 3].map(index =>
-        <span key={index}>{index === 2 ? '11' : <i />}</span>)}
-      </div>
-      <HeroHead />
+      <img className="ms-film-ribbon" src="/motion/film-ribbon.webp" width={960} height={720} alt="" fetchPriority="high" />
     </div>
   </section>
 }
@@ -244,14 +174,12 @@ function Showcase({ onOpen }: { onOpen: (clip: Clip) => void }) {
     const container = stage.current
     if (!container) return
     const cards = [...container.querySelectorAll<HTMLButtonElement>('.ms-showcase-card')]
-    const videos = cards.map(el => el.querySelector('video')!)
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const wrap = gsap.utils.wrap(-cards.length / 2, cards.length / 2)
     let visible = false
     let radius = 390
     let gap = 224
     let limit = 3.8
-    let lastPlay = -1
 
     const draw = () => {
       cards.forEach((card, index) => {
@@ -261,17 +189,6 @@ function Showcase({ onOpen }: { onOpen: (clip: Clip) => void }) {
         card.style.transform = `translate3d(${x}px, ${-abs * 3}px, ${abs * 13}px) rotateY(${offset * -8}deg)`
         card.style.visibility = abs > limit ? 'hidden' : 'visible'
         card.style.zIndex = String(Math.round(50 - abs * 10))
-      })
-    }
-
-    const play = () => {
-      const center = Math.round(position.current.value)
-      if (lastPlay === center) return
-      lastPlay = center
-      videos.forEach((video, index) => {
-        if (visible && !reduced && Math.abs(wrap(index - center)) <= 2) {
-          void video.play().catch(() => {})
-        } else video.pause()
       })
     }
 
@@ -289,16 +206,12 @@ function Showcase({ onOpen }: { onOpen: (clip: Clip) => void }) {
         position.current.value += Math.min(delta, 50) * .00042
       }
       draw()
-      play()
     }
 
     const observer = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting
       gsap.ticker.remove(tick)
-      if (visible) {
-        lastPlay = -1
-        gsap.ticker.add(tick)
-      } else videos.forEach(video => video.pause())
+      if (visible) gsap.ticker.add(tick)
     }, { rootMargin: '80px' })
     const resize = new ResizeObserver(measure)
     observer.observe(container)
@@ -309,7 +222,6 @@ function Showcase({ onOpen }: { onOpen: (clip: Clip) => void }) {
       resize.disconnect()
       gsap.ticker.remove(tick)
       adjustment.current?.kill()
-      videos.forEach(video => video.pause())
     }
   }, [])
 
@@ -369,8 +281,11 @@ function Showcase({ onOpen }: { onOpen: (clip: Clip) => void }) {
           if (!suppressed.current) onOpen(clip)
           suppressed.current = false
         }}>
-        <video src={clip.video} poster={clip.poster} muted loop playsInline preload="none" aria-hidden="true" />
-        <span className="ms-showcase-label"><Play size={13} fill="currentColor" /> {clip.title}</span>
+        <img className="ms-showcase-cover" src={'/motion/covers/' + clip.id + '.webp'} alt="" loading="lazy" draggable={false} />
+        <span className="ms-showcase-label">
+          <span><small>{clip.topic}</small><strong>{clip.title}</strong></span>
+          <i aria-hidden="true"><Play size={13} fill="currentColor" /></i>
+        </span>
       </button>)}
     </div>
   </section>
@@ -528,7 +443,7 @@ export default function MotionHome() {
       {content && <div className="ms-dialog-content">
         <button className="ms-dialog-close" aria-label="Close preview" onClick={() => dialog.current?.close()}><X size={22} /></button>
         <video key={content.type === 'clip' ? content.clip.id : 'guide'} src={content.type === 'clip' ? content.clip.video : '/sample/feedback.mp4'}
-          poster={content.type === 'clip' ? content.clip.poster : '/sample/feedback.webp'} controls playsInline autoPlay />
+          poster={content.type === 'clip' ? '/motion/covers/' + content.clip.id + '.webp' : '/sample/feedback.webp'} controls playsInline autoPlay />
         <div>
           <h2>{content.type === 'clip' ? content.clip.title : 'From a PDF to a short.'}</h2>
           <p>{content.type === 'clip' ? content.clip.description : 'Here’s a finished lesson from the feedback guide. Open the studio to try the quiz or make a short from your own PDF.'}</p>
