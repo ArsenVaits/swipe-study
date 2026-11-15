@@ -1,0 +1,146 @@
+[
+  {
+    "id": "ai-prompts",
+    "topic": "AI",
+    "title": "Give AI a better brief",
+    "video": "/discover/ai-prompts.mp4",
+    "poster": "/discover/ai-prompts.webp",
+    "description": "State the goal Add the context and output format. Check the result."
+  },
+  {
+    "id": "ai-grounding",
+    "topic": "AI",
+    "title": "Ground AI answers",
+    "video": "/discover/ai-grounding.mp4",
+    "poster": "/discover/ai-grounding.webp",
+    "description": "Provide a source Ask for a quote with each claim. Check the quote yourself."
+  },
+  {
+    "id": "devops-ci",
+    "topic": "DevOps",
+    "title": "What CI checks",
+    "video": "/discover/devops-ci.mp4",
+    "poster": "/discover/devops-ci.webp",
+    "description": "Push a change Run the build and tests automatically. Fix failures before merging."
+  },
+  {
+    "id": "devops-rollbacks",
+    "topic": "DevOps",
+    "title": "Plan a rollback",
+    "video": "/discover/devops-rollbacks.mp4",
+    "poster": "/discover/devops-rollbacks.webp",
+    "description": "Know the last good release Keep its artifact available. Verify health after rollback."
+  },
+  {
+    "id": "devops-health",
+    "topic": "DevOps",
+    "title": "Health vs. readiness",
+    "video": "/discover/devops-health.mp4",
+    "poster": "/discover/devops-health.webp",
+    "description": "Is it running? Can it take traffic now? Check both separately."
+  },
+  {
+    "id": "focus",
+    "topic": "Productivity",
+    "title": "Make a task startable",
+    "video": "/discover/focus.mp4",
+    "poster": "/discover/focus.webp",
+    "description": "Pick one task Write the next physical action. Make the first step small."
+  },
+  {
+    "id": "handoff",
+    "topic": "Communication",
+    "title": "A clearer handoff",
+    "video": "/discover/handoff.mp4",
+    "poster": "/discover/handoff.webp",
+    "description": "Say what changed Name the owner and open issue. Agree on the next check-in."
+  },
+  {
+    "id": "design-hierarchy",
+    "topic": "Design",
+    "title": "Build visual hierarchy",
+    "video": "/discover/design-hierarchy.mp4",
+    "poster": "/discover/design-hierarchy.webp",
+    "description": "Pick the main action Give it the clearest contrast. Give secondary actions room."
+  },
+  {
+    "id": "design-feedback",
+    "topic": "Design",
+    "title": "Design useful errors",
+    "video": "/discover/design-feedback.mp4",
+    "poster": "/discover/design-feedback.webp",
+    "description": "Say what happened Point to the affected field. Tell people how to recover."
+  },
+  {
+    "id": "code-functions",
+    "topic": "Programming",
+    "title": "Think in functions",
+    "video": "/discover/code-functions.mp4",
+    "poster": "/discover/code-functions.webp",
+    "description": "Pick one responsibility Give the function clear inputs. Return a useful result."
+  },
+  {
+    "id": "code-debug",
+    "topic": "Programming",
+    "title": "Reproduce a bug",
+    "video": "/discover/code-debug.mp4",
+    "poster": "/discover/code-debug.webp",
+    "description": "Make the bug repeatable Reduce it to a small example. Change one thing at a time."
+  },
+  {
+    "id": "math-percent",
+    "topic": "Mathematics",
+    "title": "Percent change",
+    "video": "/discover/math-percent.mp4",
+    "poster": "/discover/math-percent.webp",
+    "description": "Start with the old value Divide the change by the old value. Multiply the result by 100."
+  },
+  {
+    "id": "math-average",
+    "topic": "Mathematics",
+    "title": "Mean and median",
+    "video": "/discover/math-average.mp4",
+    "poster": "/discover/math-average.webp",
+    "description": "Add, then divide The median is the middle sorted value. Use it to reduce outlier effects."
+  },
+  {
+    "id": "geo-scale",
+    "topic": "Geography",
+    "title": "Read a map scale",
+    "video": "/discover/geo-scale.mp4",
+    "poster": "/discover/geo-scale.webp",
+    "description": "Find the scale bar Compare the map distance to the bar. Check the units."
+  },
+  {
+    "id": "geo-time",
+    "topic": "Geography",
+    "title": "Why time zones exist",
+    "video": "/discover/geo-time.mp4",
+    "poster": "/discover/geo-time.webp",
+    "description": "Earth rotates Different places face the Sun at different times. Time zones standardize local clocks."
+  },
+  {
+    "id": "science-controls",
+    "topic": "Science",
+    "title": "What a control does",
+    "video": "/discover/science-controls.mp4",
+    "poster": "/discover/science-controls.webp",
+    "description": "Keep a comparison Change one condition in the test group. Compare both outcomes."
+  },
+  {
+    "id": "history-sources",
+    "topic": "History",
+    "title": "Read a primary source",
+    "video": "/discover/history-sources.mp4",
+    "poster": "/discover/history-sources.webp",
+    "description": "Start with the author Ask when and why it was made. Compare it with another source."
+  },
+  {
+    "id": "language-recall",
+    "topic": "Languages",
+    "title": "Remember a new word",
+    "video": "/discover/language-recall.mp4",
+    "poster": "/discover/language-recall.webp",
+    "description": "Recall before checking Use the word in a sentence. Review it again later."
+  }
+]

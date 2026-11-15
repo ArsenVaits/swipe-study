@@ -1,0 +1,87 @@
+html:has(.site-shell) {
+  color-scheme: dark;
+  --background: #000;
+  --surface: #111113;
+  --ink: #f7f7f8;
+  --muted: #a2a2a9;
+  --line: #29292e;
+  --purple: #a1a5d0;
+  --purple-dark: #bfc2ec;
+  --soft-purple: #252638;
+  --display: 'Geist Variable', Arial, sans-serif;
+  --body: 'Geist Variable', Arial, sans-serif;
+}
+
+.site-shell { min-height: 100vh; }
+.site-shell .site-header { position: sticky; top: 0; z-index: 10; padding: 12px 8px 0; background: transparent; border: 0; }
+.site-shell .header-inner {
+  width: min(100%, 1152px); min-height: 56px; height: auto;
+  border: 1px dashed #252525; border-radius: 11px; padding-inline: 20px;
+  background: #060606d9; backdrop-filter: blur(18px);
+}
+.site-shell .header-inner nav button { min-height: 54px; }
+.site-shell .brand-study { color: #fff; font-weight: 450; }
+.site-shell .brand-mark { width: 25px; height: 25px; border-radius: 5px; color: #d4d6f4; background: radial-gradient(circle at 36% 45%, #383958, #0e0d17 72%); }
+.site-shell .header-action, .site-shell .primary {
+  color: #101015; background: linear-gradient(#fff, #b8b8b8); border: 1px solid #ffffff32;
+}
+.site-shell .header-action:hover, .site-shell .primary:hover:not(:disabled) { background: linear-gradient(#fff, #d5d5df); }
+.site-shell .primary:disabled { background: #222228; color: #93939e; }
+.site-shell .dropzone { background: #111113; border-color: #65677d; }
+.site-shell .dropzone:hover, .site-shell .dropzone.is-dragging { background: #222239; border-color: var(--purple); }
+.site-shell .sample-row, .site-shell .feed-navigation { border-color: var(--line); }
+.site-shell .sample-row:hover, .site-shell .text-button:hover, .site-shell .source-link:hover { color: #fff; }
+.site-shell .rail-button, .site-shell .icon-control, .site-shell .detail-panel, .site-shell .document-panel,
+.site-shell .page-nav select, .site-shell .secondary, .site-shell .saved-list, .site-shell .empty-library,
+.site-shell .discovery-search, .site-shell .skip-link {
+  background: var(--surface);
+  color: var(--ink);
+}
+.site-shell .rail-button:hover:not(:disabled), .site-shell .icon-control:hover:not(:disabled),
+.site-shell .rail-button[aria-pressed=true], .site-shell .quiz-option:hover, .site-shell .quiz-option:has(input:checked) {
+  background: var(--soft-purple); border-color: #626786;
+}
+.site-shell .quiz-passage, .site-shell .source-panel blockquote, .site-shell .selected-excerpt,
+.site-shell .passage { background: #181822; color: #d0d0dc; }
+.site-shell .option-letter { background: #282940; color: #d7d9f2; }
+.site-shell .quiz-option.is-correct { background: #192d25; color: #a8e2c8; border-color: #387456; }
+.site-shell .quiz-option.is-wrong { background: #301d24; color: #f0b6c0; border-color: #864452; }
+.site-shell .quiz-result { background: #252638; color: #e2e3f3; }
+.site-shell .value-pill, .site-shell .source-label { color: #c8c9e6; }
+.site-shell .hero-title { font-family: 'Fraunces Variable', Georgia, serif; font-weight: 600; letter-spacing: -.05em; }
+.site-shell .hero-title em { color: #a1a5d0; }
+.site-shell .discovery-viewer { background: #08080b; }
+.site-shell .viewer-close, .site-shell .viewer-action { background: #242535; }
+.site-shell .viewer-action[aria-pressed=true] { color: #101018; }
+.site-shell .feed-section { scroll-margin-top: 78px; }
+
+@media (max-width: 700px) {
+  .site-shell .header-inner { padding-inline: 10px; }
+  .site-shell .header-inner nav button { min-height: 46px; }
+}
+
+.saved-video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  gap: 14px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+}
+.saved-video-card {
+  min-width: 0;
+  max-width: 300px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+}
+.saved-video-card video, .saved-video-placeholder {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  background: #08080a;
+  object-fit: contain;
+}
+.saved-video-placeholder { display: grid; place-content: center; text-align: center; padding: 16px; }
+.saved-video-info { display: flex; align-items: start; gap: 8px; padding: 12px; }
