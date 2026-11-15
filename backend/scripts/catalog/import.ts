@@ -2,6 +2,7 @@
 //   node --env-file=<backend env> scripts/catalog/import.ts <build-out-dir>
 // Copies <id>.mp4 to <VIDEO_OUTPUT_DIR>/catalog/ and upserts the lesson with its track id.
 
+import { spawnSync } from "node:child_process";
 import { copyFile, mkdir, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { TRACKS } from "../../src/catalog/tracks.ts";
@@ -28,6 +29,12 @@ for (const f of (await readdir(src)).filter((n) => n.endsWith(".json")).sort()) 
   }
   const target = path.join(outDir, `${meta.id}.mp4`);
   if ((await stat(target).catch(() => null))?.size !== size) await copyFile(mp4, target);
+  // Poster for library cards: the title frame (served next to the video as <id>.webp).
+  const poster = path.join(outDir, `${meta.id}.webp`);
+  if (!(await stat(poster).catch(() => null))?.size) {
+    const r = spawnSync(config.FFMPEG_PATH, ["-v", "error", "-y", "-ss", "1.6", "-i", target, "-frames:v", "1", "-vf", "scale=540:-2", "-quality", "80", poster]);
+    if (r.status !== 0) console.warn(`[import] ${meta.id}: poster failed: ${r.stderr?.toString().slice(0, 200)}`);
+  }
   upsertCatalogLesson({
     id: meta.id,
     track: meta.track,

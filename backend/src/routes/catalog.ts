@@ -39,6 +39,7 @@ catalogRouter.get("/", (req, res) => {
       status: "ready",
       lesson: i.lesson,
       videoUrl: i.videoUrl,
+      posterUrl: i.videoUrl.replace(/\.mp4$/, ".webp"),
       error: null,
       track: i.track,
       trackTitle: titles.get(i.track),

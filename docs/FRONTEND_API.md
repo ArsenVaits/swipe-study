@@ -206,7 +206,7 @@ GET /api/lesson-jobs/:jobId  каждые 3–5 с
 
 ```json
 {
-  "lessons": [{ "jobId": "ai-01", "status": "ready", "lesson": { … }, "videoUrl": "/api/media/catalog/ai-01.mp4", "error": null,
+  "lessons": [{ "jobId": "ai-01", "status": "ready", "lesson": { … }, "videoUrl": "/api/media/catalog/ai-01.mp4", "posterUrl": "/api/media/catalog/ai-01.webp", "error": null,
                 "track": "ai", "trackTitle": "AI", "position": 1, "durationSeconds": 41.2 }],
   "total": 40, "limit": 20, "offset": 0
 }
