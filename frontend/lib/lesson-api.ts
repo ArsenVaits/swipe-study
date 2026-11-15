@@ -169,6 +169,29 @@ export async function listSessionLessons(sessionId: string, signal: AbortSignal)
   return body as { lessons: SessionLesson[]; sets: LessonSet[] };
 }
 
+/** A ready-made catalog video (GET /api/catalog), see docs/FRONTEND_API.md §3.5. */
+export type CatalogLesson = {
+  jobId: string;
+  lesson: ApiLesson;
+  videoUrl: string;
+  posterUrl: string;
+  track: string;
+  trackTitle: string;
+  position: number;
+  durationSeconds: number;
+};
+
+/** Catalog videos of one track, e.g. "programming" (the id is the topic label in lower case). */
+export async function listCatalog(track: string, signal: AbortSignal) {
+  const response = await fetch("/api/catalog?limit=100&track=" + encodeURIComponent(track), {
+    signal: AbortSignal.any([signal, AbortSignal.timeout(20_000)]),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new LessonApiError(response.status, body?.error?.code);
+  if (!Array.isArray(body?.lessons)) throw new Error("Invalid catalog response");
+  return body.lessons as CatalogLesson[];
+}
+
 export function toLesson(data: ApiLesson): Lesson {
   return {
     title: data.title,

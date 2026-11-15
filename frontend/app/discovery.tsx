@@ -3,6 +3,7 @@
 import { ArrowLeft, ArrowUpRight, Bookmark, Clapperboard, Search, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import seedVideos from '@/lib/discovery-seeds.json'
+import { listCatalog } from '@/lib/lesson-api'
 
 const categories = [
   { label: 'Programming', keywords: 'code coding development программирование код разработка' },
@@ -20,6 +21,30 @@ const categories = [
 export const topics = categories.map(item => item.label)
 type Topic = typeof topics[number]
 type Video = typeof seedVideos[number]
+
+// Server catalog videos by topic (GET /api/catalog?track=<topic in lower case>); the bundled seeds stay as extras.
+function useCatalog(topic: string | null) {
+  const [videos, setVideos] = useState<Record<string, Video[]>>({})
+  useEffect(() => {
+    if (!topic || videos[topic]) return
+    const request = new AbortController()
+    listCatalog(topic.toLowerCase(), request.signal)
+      .then(lessons => setVideos(previous => ({
+        ...previous,
+        [topic]: lessons.map(item => ({
+          id: item.jobId,
+          topic,
+          title: item.lesson.title,
+          video: item.videoUrl,
+          poster: item.posterUrl,
+          description: [item.lesson.hook, ...item.lesson.captions].join(' '),
+        })),
+      })))
+      .catch(() => undefined) // offline or older server: the bundled seeds still show
+    return () => request.abort()
+  }, [topic, videos])
+  return videos
+}
 const bookmarkKey = 'scrolled-discovery-saved'
 
 function readList<T>(key: string): T[] {
@@ -50,6 +75,7 @@ export default function Discovery({
   const currentId = useRef<string | null>(null)
   const scrollGesture = useRef({ at: -Infinity, direction: 0, distance: 0, consumed: false })
   const topicHeading = useRef<HTMLHeadingElement>(null)
+  const catalog = useCatalog(mode === 'library' ? topic : null)
 
   useEffect(() => {
     setBookmarks(readList<Video>(bookmarkKey))
@@ -66,9 +92,9 @@ export default function Discovery({
     if (mode === 'saved') return bookmarks
     if (!topic) return []
     const terms = query.toLocaleLowerCase().trim().split(/\s+/)
-    return seedVideos.filter(item => item.topic === topic &&
+    return [...(catalog[topic] ?? []), ...seedVideos].filter(item => item.topic === topic &&
       terms.every(term => [item.title, item.description].join(' ').toLocaleLowerCase().includes(term)))
-  }, [bookmarks, mode, query, topic])
+  }, [bookmarks, catalog, mode, query, topic])
 
   const index = playlist.findIndex(item => item.id === active?.id)
   const isSaved = active !== null && bookmarks.some(item => item.id === active.id)
