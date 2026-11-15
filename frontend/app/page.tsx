@@ -381,7 +381,7 @@ export default function Studio() {
           <button
             type='button'
             className='wordmark'
-            aria-label='ScrollEd home'
+            aria-label='swipe study home'
             onClick={() => {
               setTab('feed')
               goTo(entries[0].id, false)
@@ -391,7 +391,7 @@ export default function Studio() {
               <Layers3 size={20} strokeWidth={2.4} />
             </span>
             <span>
-              Scroll<span className='brand-ed'>Ed</span>
+              swipe <span className='brand-study'>study</span>
               <span className='brand-dot'>.</span>
             </span>
           </button>
@@ -515,7 +515,7 @@ export default function Studio() {
                   Choose a passage.
                 </h1>
                 <p className='editor-description'>
-                  ScrollEd uses the first page of your PDF to create your lesson.
+                  swipe study uses the first page of your PDF to create your lesson.
                 </p>
                 <div className='document-panel'>
                   <div className='document-name'>
@@ -556,7 +556,7 @@ export default function Studio() {
                 <h1 id='upload-title' className='hero-title'>
                   Your PDFs.
                   <br />
-                  <em>In a scroll.</em>
+                  <em>In a swipe.</em>
                 </h1>
                 <p className='hero-description'>
                   Turn a passage from a work PDF into a short lesson you can watch, quiz, and

@@ -31,9 +31,9 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 
 .site-header { background: var(--surface); border-bottom: 1px solid var(--line); }
 .header-inner { height: 72px; margin: auto; width: min(100% - 72px, 1320px); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
-.wordmark { display: inline-flex; align-items: center; gap: 9px; width: fit-content; font-family: var(--display); font-weight: 850; font-size: 24px; letter-spacing: -.04em; }
-.brand-mark { color: #fff; background: var(--purple); width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; }
-.brand-ed { color: var(--purple); }
+.wordmark { display: inline-flex; align-items: center; gap: 9px; width: fit-content; font-family: var(--display); font-weight: 850; font-size: 24px; letter-spacing: -.04em; white-space: nowrap; }
+.brand-mark { color: #fff; background: var(--purple); width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center; border-radius: 9px; }
+.brand-study { color: var(--purple); }
 .brand-dot { color: var(--purple); }
 .header-inner nav { display: flex; align-items: center; height: 100%; gap: 30px; }
 .header-inner nav button { position: relative; display: flex; align-items: center; gap: 7px; height: 100%; color: var(--muted); font-weight: 650; font-size: 14px; }
@@ -204,11 +204,11 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
 }
 @media (max-width: 640px) {
   :root { --feed-height: min(610px, max(420px, 67dvh), calc((100vw - 72px) * 1.7778)); }
-  .header-inner { height: 58px; width: calc(100% - 26px); gap: 7px; }
+  .header-inner { height: 58px; width: calc(100% - 26px); gap: 7px; grid-template-columns: auto 1fr auto; }
   .wordmark { font-size: 19px; gap: 5px; }
   .brand-mark { width: 27px; height: 27px; border-radius: 7px; }
   .brand-mark svg { width: 16px; }
-  .header-inner nav { gap: 13px; }
+  .header-inner nav { gap: 13px; justify-content: center; }
   .header-inner nav button { font-size: 12px; gap: 4px; }
   .header-inner nav button svg { width: 14px; }
   .header-action { padding: 0 8px; gap: 4px; min-height: 36px; font-size: 12px; }
@@ -231,12 +231,14 @@ button, a, select, .shorts, .passage { -webkit-tap-highlight-color: transparent;
   .video-caption { bottom: 60px; font-size: 14px; }
   .lesson-info { padding-top: 19px; }
 }
-@media (max-width: 360px) {
-  .header-inner nav button svg { display: none; }
-  .header-inner nav { gap: 9px; }
+@media (max-width: 420px) {
   .header-action { width: 36px; padding: 0; justify-content: center; }
   .header-action span { display: none; }
   .header-action svg { width: 19px; }
+}
+@media (max-width: 360px) {
+  .wordmark { font-size: 17px; }
+  .header-inner nav { gap: 9px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }

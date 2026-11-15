@@ -65,7 +65,7 @@ app.use(express.static(PUBLIC_DIR, { index: false }));
 app.use(errorHandler);
 
 app.listen(config.PORT, () => {
-  console.log(`ScrollEd backend on http://localhost:${config.PORT} (video provider: ${videoProvider.name})`);
+  console.log(`swipe study backend on http://localhost:${config.PORT} (video provider: ${videoProvider.name})`);
   if (!config.ANTHROPIC_API_KEY) console.warn("[opus] ANTHROPIC_API_KEY is not set: POST /api/lesson-jobs will return AI_NOT_CONFIGURED.");
   for (const w of videoConfigWarnings()) console.warn(w);
 });

@@ -1,4 +1,4 @@
-# ScrollEd backend (MVP)
+# swipe study backend (MVP)
 
 Production: Node 24.22.3 (pinned in `.node-version`) · TypeScript run natively by Node · Express 5 · Zod · SQLite (`node:sqlite`, a file in `data/`).
 

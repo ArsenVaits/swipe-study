@@ -1,7 +1,7 @@
 {
-  "name": "scrolled-backend",
+  "name": "swipe-study-backend",
   "version": "1.0.0",
-  "description": "ScrollEd MVP backend",
+  "description": "swipe study MVP backend",
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/server.ts",
     "start": "node --env-file-if-exists=.env src/server.ts",

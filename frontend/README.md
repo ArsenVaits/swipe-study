@@ -1,6 +1,6 @@
-# ScrollEd — frontend
+# swipe study — frontend
 
-Next.js, TypeScript, and Tailwind web app with a vertical feed of short lessons. Open a text PDF, choose a page or highlight a passage, then select Create my lesson. ScrollEd sends the selected text, document title, page number, and an anonymous browser session ID to the lesson API. The returned lesson and quiz are available while the video renders.
+Next.js, TypeScript, and Tailwind web app with a vertical feed of short lessons. Open a text PDF, choose a page or highlight a passage, then select Create my lesson. swipe study sends the selected text, document title, page number, and an anonymous browser session ID to the lesson API. The returned lesson and quiz are available while the video renders.
 
 The API contract is described in [../docs/FRONTEND_API.md](../docs/FRONTEND_API.md).
 

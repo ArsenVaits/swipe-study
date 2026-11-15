@@ -59,7 +59,7 @@ export default function Player({ video, poster, captions, title, sample, serverV
       if (!response.ok) throw new Error("Video download failed");
       const blob = await response.blob();
       const extension = blob.type.includes("webm") || /\.webm(?:[?#]|$)/i.test(video) ? "webm" : "mp4";
-      const filename = title.replace(/[^\p{L}\p{N} _-]/gu, "").trim().slice(0, 100) || "scrolled-lesson";
+      const filename = title.replace(/[^\p{L}\p{N} _-]/gu, "").trim().slice(0, 100) || "swipe-study-lesson";
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;

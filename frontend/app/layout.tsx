@@ -4,7 +4,7 @@ import "@fontsource-variable/manrope";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ScrollEd — PDF to short lessons",
+  title: "swipe study — PDF to short lessons",
   description: "Turn a passage from a work PDF into a short lesson, a video recap, and a knowledge check.",
 };
 

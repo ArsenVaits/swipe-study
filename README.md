@@ -1,4 +1,4 @@
-# ScrollEd
+# swipe study
 
 B2C app for busy adults: turns fragments of a PDF into short lessons with video, captions and a quiz, in a vertical feed.
 

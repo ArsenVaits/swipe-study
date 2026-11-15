@@ -49,7 +49,7 @@ export async function renderRecap(captions: string[]) {
       context.fillStyle = accent;
       context.font = '700 24px "DM Sans Variable", sans-serif';
       context.textAlign = "center";
-      context.fillText("SCROLLED RECAP", cx, 148);
+      context.fillText("SWIPE STUDY RECAP", cx, 148);
       context.fillStyle = "#fff";
       context.font = '700 55px "Manrope Variable", sans-serif';
       const lines = captions[index].match(/\S+(?:\s+\S+){0,2}/gu) ?? [""];
