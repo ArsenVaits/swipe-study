@@ -117,7 +117,49 @@ GET /api/lesson-jobs/:jobId  каждые 3–5 с
 - Неизвестный или некорректный `jobId` → `404 NOT_FOUND`.
 - Задачи хранятся в базе и переживают перезапуск сервера, поэтому `jobId` можно сохранить (например, в `localStorage`) и возобновить опрос после перезагрузки страницы.
 
-### 3.3. `GET /api/health` — проверка сервера
+### 3.3. Серия уроков из конспекта или книги
+
+Используйте, когда пользователь загружает материал целиком, а не выделяет один фрагмент. Сервер сам решает, сколько уроков нужно: от 1 до 10. Конспект на одну тему даёт 1 урок (максимум 2), книга — до 10 уроков по ключевым темам. Уроки появляются **по одному**, ждать всю пачку не нужно.
+
+**`POST /api/lesson-sets`** отвечает сразу, `202`:
+
+```json
+// запрос: либо sourceText, либо pages (лучше pages: тогда у каждого урока будет правильная страница)
+{ "sourceTitle": "Книга о сетях", "sessionId": "...", "pages": [{ "page": 1, "text": "..." }, { "page": 2, "text": "..." }] }
+// { "sourceTitle": "...", "sessionId": "...", "sourceText": "весь конспект", "firstPage": 1 }
+
+// ответ
+{ "setId": "uuid", "status": "planning", "planned": null, "titles": [], "lessons": [], "complete": false, "error": null }
+```
+
+**`GET /api/lesson-sets/:setId`** — опрашивайте каждые 3–5 секунд, пока `complete !== true`:
+
+```json
+{
+  "setId": "uuid",
+  "status": "generating",          // planning → generating → done | failed
+  "planned": 4,                     // сколько уроков в плане (null, пока план не готов)
+  "titles": ["Как DNS …", "Почему небо …", "Как GPS …", "Зачем нужна Kafka …"],
+  "lessons": [                      // уже созданные уроки по порядку; тот же формат, что у GET /api/lesson-jobs/:id
+    { "jobId": "…", "status": "ready", "lesson": { … }, "videoUrl": "/api/media/…mp4", "error": null },
+    { "jobId": "…", "status": "rendering_video", "lesson": { … }, "videoUrl": null, "error": null }
+  ],
+  "complete": false,                // true, когда план выполнен и у всех уроков видео готово или упало
+  "error": null                     // { code, message } если серия упала целиком
+}
+```
+
+Как показывать в ленте:
+- Пока `status === "planning"`, показывайте «Читаем материал…». Обычно это 5–10 секунд.
+- Когда пришёл `titles`, можно сразу нарисовать заглушки карточек с названиями.
+- Каждый элемент `lessons[i]` показывайте как обычный урок. Урок с квизом появляется раньше видео, видео подтягивается по `videoUrl`.
+- `status: "failed"` с `error.code === "INTERRUPTED"` значит, что сервер перезапустился посреди серии. Уже созданные уроки остаются, остальных не будет.
+- Ошибки `POST` те же, что у `/api/lesson-jobs`: `400 VALIDATION_ERROR`, `413 PAYLOAD_TOO_LARGE` (материал больше 300 000 символов), `429 SESSION_LIMIT_REACHED`, `503 AI_NOT_CONFIGURED`. Ошибка плана (`INSUFFICIENT_SOURCE`, `LESSON_GENERATION_FAILED`) приходит в `error` серии.
+- Каждый урок серии считается в лимит уроков сессии. Сервер не сделает больше уроков, чем осталось в лимите.
+
+Длина каждого ролика — от 35 до 60 секунд.
+
+### 3.4. `GET /api/health` — проверка сервера
 
 ```json
 { "ok": true, "videoProvider": "mock", "lessonAi": "configured", "tts": "none" }

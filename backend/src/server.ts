@@ -4,7 +4,9 @@ import { config } from "./config.ts";
 import { deploymentIdentity } from "./deployment.ts";
 import { errorHandler } from "./http/errors.ts";
 import { PUBLIC_DIR } from "./paths.ts";
+import { failInterruptedSets } from "./db.ts";
 import { lessonJobsRouter } from "./routes/lessonJobs.ts";
+import { lessonSetsRouter } from "./routes/lessonSets.ts";
 import { ttsProviderName } from "./tts/index.ts";
 import { MEDIA_URL_PREFIX } from "./video/hyperframes/provider.ts";
 import { videoConfigWarnings, videoProvider } from "./video/index.ts";
@@ -29,6 +31,8 @@ app.use((req, res, next) => {
   next();
 });
 
+// Whole notes or books are large; every other route keeps the small body limit.
+app.use("/api/lesson-sets", express.json({ limit: "3mb" }), lessonSetsRouter);
 app.use(express.json({ limit: "100kb" }));
 
 app.get("/api/health", (_req, res) => {
@@ -68,4 +72,6 @@ app.listen(config.PORT, () => {
   console.log(`swipe study backend on http://localhost:${config.PORT} (video provider: ${videoProvider.name})`);
   if (!config.ANTHROPIC_API_KEY) console.warn("[opus] ANTHROPIC_API_KEY is not set: POST /api/lesson-jobs will return AI_NOT_CONFIGURED.");
   for (const w of videoConfigWarnings()) console.warn(w);
+  const interrupted = failInterruptedSets();
+  if (interrupted) console.warn(`[set] ${interrupted} lesson series were cut off by the restart and marked failed`);
 });

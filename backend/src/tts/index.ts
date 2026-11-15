@@ -71,7 +71,7 @@ export async function buildVoiceover(narration: string, assetsDir: string): Prom
     });
     parts.push(silence(TAIL_S));
     await writeFile(`${assetsDir}/voice.wav`, pcmToWav(Buffer.concat(parts)));
-    return { file: "voice.wav", lines, duration: round(t + TAIL_S) };
+    return { file: "voice.wav", lines, duration: clampDuration(t + TAIL_S) };
   } catch (err) {
     console.warn("[tts] voiceover failed, rendering a silent video:", err instanceof Error ? err.message : err);
     return silentTimeline(texts);
@@ -86,7 +86,7 @@ function silentTimeline(texts: string[]): Voiceover {
     lines.push({ text, start: round(t), end: round(t + len) });
     t += len + GAP_S;
   }
-  return { file: null, lines, duration: round(t + TAIL_S) };
+  return { file: null, lines, duration: clampDuration(t + TAIL_S) };
 }
 
 async function synthesize(text: string): Promise<Buffer> {
@@ -236,3 +236,11 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/** Videos run at least VIDEO_MIN_SECONDS: a short voiceover gets a longer final hold. */
+function clampDuration(seconds: number): number {
+  if (seconds > config.VIDEO_MAX_SECONDS) {
+    console.warn(`[tts] voiceover runs ${seconds.toFixed(1)} s, over the ${config.VIDEO_MAX_SECONDS} s target`);
+  }
+  return round(Math.max(seconds, config.VIDEO_MIN_SECONDS));
+}

@@ -4,6 +4,9 @@ import { config } from "../config.ts";
 import { ApiError } from "../http/errors.ts";
 import { LessonOutputSchema, LessonSchema, StartVideoInputSchema, type Lesson } from "./schema.ts";
 
+/** ~35 s of speech; shorter narrations are sent back once for a longer version. */
+const MIN_NARRATION_WORDS = 85;
+
 // API key is read by the SDK from ANTHROPIC_API_KEY (server env only).
 const client = new Anthropic({ timeout: 120_000, maxRetries: 1 });
 
@@ -17,7 +20,7 @@ Grounding rules:
 Lesson fields:
 - title: under 70 characters. hook: one sentence, the key takeaway.
 - explanation: 2-4 short paragraphs in plain language, under 1200 characters.
-- narration: a voiceover script of about 30-40 seconds (70-100 words) that a narrator reads aloud.
+- narration: a voiceover script of 40-55 seconds that a narrator reads aloud: 100-130 words, never fewer than 90. It explains the idea step by step, not just the hook.
 - captions: 3-6 short on-screen captions (under 90 characters each) that follow the narration.
 - scenePrompt: one visual metaphor for the idea, described as a cinematic shot (subject, setting, camera motion, mood). Vertical 9:16 framing, about 6 seconds. No text, letters, logos, brands or real people.
 - quiz: one question testing understanding (not trivia), 3 or 4 distinct options, exactly one correct; answerIndex is its 0-based index; explanation says why it is correct, citing the source idea.
@@ -45,6 +48,8 @@ export interface GenerateLessonInput {
   sourceTitle: string;
   sourcePage: number;
   sourceText: string;
+  /** Set when the lesson is one of a series planned from larger material. */
+  focus?: { title: string; question: string; otherLessons: string[] };
   /** Called when Opus requests video generation. Returns the text for the tool_result. */
   onStartVideo?: (scenePrompt: string) => Promise<{ ok: boolean; message: string }>;
 }
@@ -60,6 +65,14 @@ export async function generateLesson(input: GenerateLessonInput): Promise<Lesson
     `<source_title>${escapeXml(input.sourceTitle)}</source_title>\n` +
     `<source_page>${input.sourcePage}</source_page>\n` +
     `<source_text>\n${escapeXml(input.sourceText)}\n</source_text>\n\n` +
+    (input.focus
+      ? `This lesson is one of a series made from a larger document. Answer only this question: "${input.focus.question}" ` +
+        `(working title: "${input.focus.title}").` +
+        (input.focus.otherLessons.length
+          ? ` Other lessons in the series cover: ${input.focus.otherLessons.map((t) => `"${t}"`).join(", ")}; do not repeat them.`
+          : "") +
+        "\n\n"
+      : "") +
     (useTools
       ? "Create the micro-lesson. If the source is sufficient, first call start_video_generation with the scene, then return the lesson JSON."
       : "Create the micro-lesson and return it as JSON.");
@@ -91,7 +104,25 @@ export async function generateLesson(input: GenerateLessonInput): Promise<Lesson
       continue;
     }
 
-    return parseLesson(response, input);
+    const lesson = parseLesson(response, input);
+    // Videos must run at least ~35 s, so a too-short narration gets one rewrite (cheap with Haiku).
+    const words = lesson.narration.split(/\s+/).filter(Boolean).length;
+    if (words >= MIN_NARRATION_WORDS) return lesson;
+    console.warn(`[lesson] narration has ${words} words, asking for a longer one`);
+    messages.push({ role: "assistant", content: response.content });
+    messages.push({
+      role: "user",
+      content: `The narration has only ${words} words. Return the complete lesson JSON again with a narration of 100-130 words (40-55 seconds), keeping everything grounded in the source.`,
+    });
+    const retry = await callOpus(messages, false);
+    logUsage("lesson-retry", retry);
+    if (retry.stop_reason !== "end_turn") return lesson;
+    try {
+      const longer = parseLesson(retry, input);
+      return longer.narration.length > lesson.narration.length ? longer : lesson;
+    } catch {
+      return lesson;
+    }
   }
   throw new ApiError(502, "LESSON_GENERATION_FAILED", "The AI did not finish the lesson. Please try again.");
 }

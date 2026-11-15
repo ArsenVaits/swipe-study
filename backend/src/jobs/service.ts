@@ -10,7 +10,7 @@ import {
   type JobRecord,
 } from "../db.ts";
 import { ApiError } from "../http/errors.ts";
-import { generateLesson } from "../lessons/generateLesson.ts";
+import { generateLesson, type GenerateLessonInput } from "../lessons/generateLesson.ts";
 import type { CreateLessonJobBody } from "../lessons/schema.ts";
 import { videoProvider } from "../video/index.ts";
 import { VideoProviderError, type VideoStartInput } from "../video/types.ts";
@@ -33,25 +33,30 @@ export async function createLessonJob(body: CreateLessonJobBody) {
   if (countJobsForSession(body.sessionId) >= config.MAX_LESSON_JOBS_PER_SESSION) {
     throw new ApiError(429, "SESSION_LIMIT_REACHED", `This session has reached the limit of ${config.MAX_LESSON_JOBS_PER_SESSION} lessons.`);
   }
-
   const jobId = randomUUID();
-  insertJob({
-    id: jobId,
-    sessionId: body.sessionId,
-    sourceTitle: body.sourceTitle,
-    sourcePage: body.sourcePage,
-    sourceChars: body.sourceText.length,
-  });
+  insertJob({ id: jobId, sessionId: body.sessionId, sourceTitle: body.sourceTitle, sourcePage: body.sourcePage, sourceChars: body.sourceText.length });
+  const failure = await runLessonJob(jobId, body);
+  if (failure) throw new ApiError(failure.status, failure.code, failure.message, { details: failure.details, jobId });
+  return toDto(getJob(jobId)!);
+}
 
+/**
+ * Generates the lesson for an inserted job and starts its video. Never throws: a lesson failure is
+ * recorded on the job and returned (so the HTTP route can report it); a video failure keeps the lesson.
+ */
+export async function runLessonJob(
+  jobId: string,
+  input: { sourceTitle: string; sourcePage: number; sourceText: string; sessionId: string; focus?: GenerateLessonInput["focus"] },
+): Promise<ApiError | null> {
   // At most one video start per job, whether Opus triggers it via tool call or we do it ourselves.
   let videoAttempted = false;
   let videoError: { code: string; message: string } | null = null;
 
-  const startVideo = async (input: VideoStartInput): Promise<{ ok: boolean; message: string }> => {
+  const startVideo = async (start: VideoStartInput): Promise<{ ok: boolean; message: string }> => {
     if (videoAttempted) return { ok: false, message: "Video generation was already requested." };
     videoAttempted = true;
 
-    if (countVideoStartsForSession(body.sessionId) >= config.MAX_VIDEO_JOBS_PER_SESSION) {
+    if (countVideoStartsForSession(input.sessionId) >= config.MAX_VIDEO_JOBS_PER_SESSION) {
       videoError = { code: "VIDEO_LIMIT_REACHED", message: `Video limit for this session (${config.MAX_VIDEO_JOBS_PER_SESSION}) reached. The lesson is still available.` };
       return { ok: false, message: "Video is not available for this lesson." };
     }
@@ -62,7 +67,7 @@ export async function createLessonJob(body: CreateLessonJobBody) {
     }
 
     try {
-      const { providerJobId } = await videoProvider.start(input);
+      const { providerJobId } = await videoProvider.start(start);
       updateJob(jobId, { videoProvider: videoProvider.name, providerJobId });
       return { ok: true, message: "Video rendering started." };
     } catch (err) {
@@ -79,7 +84,10 @@ export async function createLessonJob(body: CreateLessonJobBody) {
   try {
     // Providers that build the video from the finished lesson can't be started mid-generation by a tool call.
     lesson = await generateLesson({
-      ...body,
+      sourceTitle: input.sourceTitle,
+      sourcePage: input.sourcePage,
+      sourceText: input.sourceText,
+      focus: input.focus,
       onStartVideo: videoProvider.needsLesson ? undefined : (scenePrompt) => startVideo({ scenePrompt }),
     });
   } catch (err) {
@@ -87,7 +95,7 @@ export async function createLessonJob(body: CreateLessonJobBody) {
       err instanceof ApiError ? err : new ApiError(502, "LESSON_GENERATION_FAILED", "Lesson generation failed.");
     if (!(err instanceof ApiError)) console.error("[lesson] unexpected error:", err);
     updateJob(jobId, { status: "failed", error: { stage: "lesson", code: apiErr.code, message: apiErr.message } });
-    throw new ApiError(apiErr.status, apiErr.code, apiErr.message, { details: apiErr.details, jobId });
+    return apiErr;
   }
 
   updateJob(jobId, { lesson });
@@ -101,7 +109,7 @@ export async function createLessonJob(body: CreateLessonJobBody) {
   } else {
     updateJob(jobId, { status: "rendering_video" });
   }
-  return toDto(getJob(jobId)!);
+  return null;
 }
 
 // Dedupe concurrent status checks for the same job (several browser tabs polling).
