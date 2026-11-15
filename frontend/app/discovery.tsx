@@ -1,21 +1,21 @@
 'use client'
 
-import { ArrowLeft, ArrowUpRight, Atom, Bookmark, Calculator, Clapperboard, Code2, Globe2, Languages, Landmark, Layers3, MessagesSquare, Palette, Search, Server, Sparkles, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, ArrowUpRight, Bookmark, Clapperboard, Search, X } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import seedVideos from '@/lib/discovery-seeds.json'
 
 const categories = [
-  { label: 'Programming', keywords: 'code coding development программирование код разработка', icon: Code2, hue: 248 },
-  { label: 'Mathematics', keywords: 'math algebra numbers математика алгебра числа', icon: Calculator, hue: 315 },
-  { label: 'Geography', keywords: 'world maps countries география карты страны', icon: Globe2, hue: 155 },
-  { label: 'AI', keywords: 'artificial intelligence machine learning ии искусственный интеллект', icon: Sparkles, hue: 266 },
-  { label: 'DevOps', keywords: 'ci cd infrastructure deployment девопс инфраструктура деплой', icon: Server, hue: 192 },
-  { label: 'Science', keywords: 'physics experiments наука физика эксперименты', icon: Atom, hue: 219 },
-  { label: 'History', keywords: 'historical sources прошлое история', icon: Landmark, hue: 31 },
-  { label: 'Languages', keywords: 'vocabulary english языки английский', icon: Languages, hue: 331 },
-  { label: 'Productivity', keywords: 'focus time habits продуктивность фокус привычки', icon: Layers3, hue: 49 },
-  { label: 'Communication', keywords: 'feedback teamwork коммуникация общение', icon: MessagesSquare, hue: 283 },
-  { label: 'Design', keywords: 'ui ux visual дизайн интерфейс', icon: Palette, hue: 12 },
+  { label: 'Programming', keywords: 'code coding development программирование код разработка' },
+  { label: 'Mathematics', keywords: 'math algebra numbers математика алгебра числа' },
+  { label: 'Geography', keywords: 'world maps countries география карты страны' },
+  { label: 'AI', keywords: 'artificial intelligence machine learning ии искусственный интеллект' },
+  { label: 'DevOps', keywords: 'ci cd infrastructure deployment девопс инфраструктура деплой' },
+  { label: 'Science', keywords: 'physics experiments наука физика эксперименты' },
+  { label: 'History', keywords: 'historical sources прошлое история' },
+  { label: 'Languages', keywords: 'vocabulary english языки английский' },
+  { label: 'Productivity', keywords: 'focus time habits продуктивность фокус привычки' },
+  { label: 'Communication', keywords: 'feedback teamwork коммуникация общение' },
+  { label: 'Design', keywords: 'ui ux visual дизайн интерфейс' },
 ] as const
 export const topics = categories.map(item => item.label)
 type Topic = typeof topics[number]
@@ -38,12 +38,15 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
   const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState(false)
   const [active, setActive] = useState<Video | null>(null)
+  const [playlist, setPlaylist] = useState<Video[]>([])
   const [playbackError, setPlaybackError] = useState('')
   const [notice, setNotice] = useState('')
   const dialog = useRef<HTMLDialogElement>(null)
   const trigger = useRef<HTMLElement | null>(null)
   const playbackRequest = useRef<AbortController | null>(null)
-  const swipeStart = useRef<{ x: number; y: number } | null>(null)
+  const strip = useRef<HTMLDivElement>(null)
+  const startingIndex = useRef<number | null>(null)
+  const currentId = useRef<string | null>(null)
   const scrollGesture = useRef({ at: -Infinity, direction: 0, distance: 0, consumed: false })
   const topicHeading = useRef<HTMLHeadingElement>(null)
 
@@ -81,8 +84,53 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
       terms.every(term => [item.title, item.description].join(' ').toLocaleLowerCase().includes(term)))
   }, [bookmarks, catalog, mode, query, topic])
 
-  const index = items.findIndex(item => item.id === active?.id)
+  const index = playlist.findIndex(item => item.id === active?.id)
   const isSaved = active !== null && bookmarks.some(item => item.id === active.id)
+
+  useLayoutEffect(() => {
+    if (startingIndex.current === null || !strip.current) return
+    strip.current.scrollTop = startingIndex.current * strip.current.clientHeight
+    startingIndex.current = null
+  }, [playlist])
+
+  useEffect(() => {
+    const video = strip.current?.querySelector<HTMLVideoElement>('[data-active] video')
+    if (!video) return
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      void video.play().catch(() => undefined)
+    }
+    return () => video.pause()
+  }, [active?.id, active?.video])
+
+  useEffect(() => {
+    const viewer = dialog.current
+    if (!viewer || !playlist.length) return
+
+    function onWheel(event: WheelEvent) {
+      const viewport = strip.current
+      if (!viewport || event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+      event.preventDefault()
+      const direction = Math.sign(event.deltaY)
+      const gesture = scrollGesture.current
+      if (event.timeStamp - gesture.at > 140 || direction !== gesture.direction) {
+        gesture.distance = 0
+        gesture.consumed = false
+      }
+      gesture.at = event.timeStamp
+      gesture.direction = direction
+      if (gesture.consumed) return
+      const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1
+      gesture.distance += Math.abs(event.deltaY) * scale
+      if (gesture.distance < 28) return
+      gesture.consumed = true
+      const nearest = Math.round(viewport.scrollTop / viewport.clientHeight)
+      const destination = nearest + direction
+      if (playlist[destination]) scrollToSlide(viewport, destination)
+    }
+
+    viewer.addEventListener('wheel', onWheel, { passive: false })
+    return () => viewer.removeEventListener('wheel', onWheel)
+  }, [playlist])
 
   function selectTopic(value: Topic | null) {
     setTopic(value)
@@ -105,10 +153,13 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
     if (!dialog.current) return
     playbackRequest.current?.abort()
     if (button) trigger.current = button
+    currentId.current = video.id
     setActive(video)
     setPlaybackError('')
     if (!dialog.current.open) {
       scrollGesture.current = { at: -Infinity, direction: 0, distance: 0, consumed: false }
+      startingIndex.current = Math.max(0, items.findIndex(item => item.id === video.id))
+      setPlaylist(items)
       dialog.current.showModal()
     }
     if (mode !== 'saved' || !video.publishedAt) return
@@ -127,8 +178,10 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
   }
 
   function moveVideo(offset: number) {
-    const next = index < 0 ? undefined : items[index + offset]
-    if (next) openVideo(next)
+    const viewport = strip.current
+    const targetIndex = index + offset
+    if (!viewport || index < 0 || !playlist[targetIndex]) return
+    scrollToSlide(viewport, targetIndex)
   }
 
   return (
@@ -146,10 +199,9 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
             onChange={event => setQuery(event.target.value)} />
         </label>
         {!topic && (visibleTopics.length ? <ul className='discovery-grid topic-grid'>
-          {visibleTopics.map(({ label, icon: Icon, hue }) => <li key={label}>
-            <button type='button' className='topic-card' onClick={() => selectTopic(label)}
-              style={{ background: `hsl(${hue} 52% 23%)` }}>
-              <Icon className='topic-card-art' size={88} strokeWidth={1.15} aria-hidden='true' />
+          {visibleTopics.map(({ label }) => <li key={label}>
+            <button type='button' className='topic-card' onClick={() => selectTopic(label)}>
+              <img className='topic-card-art' src={'/topics/' + label.toLowerCase() + '.webp'} alt='' loading='lazy' />
               <ArrowUpRight className='topic-card-arrow' size={16} aria-hidden='true' />
               <strong>{label}</strong>
             </button>
@@ -176,27 +228,10 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
       <dialog className='discovery-viewer' aria-label='Video player' ref={dialog}
         onClose={() => {
           playbackRequest.current?.abort()
-          swipeStart.current = null
+          currentId.current = null
+          setPlaylist([])
           setActive(null)
           trigger.current?.focus()
-        }}
-        onWheel={event => {
-          if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
-          const direction = Math.sign(event.deltaY)
-          const gesture = scrollGesture.current
-          if (event.timeStamp - gesture.at > 140 || direction !== gesture.direction) {
-            gesture.distance = 0
-            gesture.consumed = false
-          }
-          gesture.at = event.timeStamp
-          gesture.direction = direction
-          if (gesture.consumed) return
-          const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1
-          gesture.distance += Math.abs(event.deltaY) * scale
-          if (gesture.distance >= 28) {
-            gesture.consumed = true
-            moveVideo(direction)
-          }
         }}
         onKeyDown={event => {
           if (event.target instanceof HTMLVideoElement) return
@@ -207,37 +242,47 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
         }}>
         <button type='button' className='viewer-close' aria-label='Close video' autoFocus onClick={() => dialog.current?.close()}><X size={25} /></button>
         {active && <div className='discovery-viewer-layout'>
-          <div className='discovery-player'>
-            {playbackError ? <p role='status'>{playbackError}</p> :
-              active.video ? <video key={active.id} src={active.video} poster={active.poster} autoPlay={!window.matchMedia('(prefers-reduced-motion: reduce)').matches}
-                playsInline muted loop controls aria-label={active.title} onError={() => setPlaybackError('This video could not be played.')} /> :
-                <p role='status'>Loading video…</p>}
-            <div className='viewer-swipe-area' aria-hidden='true'
-              onPointerDown={event => {
-                if (!event.isPrimary || event.button !== 0) return
-                swipeStart.current = { x: event.clientX, y: event.clientY }
-                event.currentTarget.setPointerCapture(event.pointerId)
-              }}
-              onPointerUp={event => {
-                const start = swipeStart.current
-                swipeStart.current = null
-                if (!start) return
-                const distance = start.y - event.clientY
-                if (Math.abs(distance) >= 35 && Math.abs(distance) > Math.abs(start.x - event.clientX)) {
-                  moveVideo(Math.sign(distance))
-                }
-              }}
-              onPointerCancel={() => { swipeStart.current = null }} />
+          <div className='discovery-player' ref={strip} onScroll={event => {
+            if (startingIndex.current !== null) return
+            const viewport = event.currentTarget
+            const visible = playlist[Math.round(viewport.scrollTop / viewport.clientHeight)]
+            if (visible && visible.id !== currentId.current) openVideo(visible)
+          }}>
+            {playlist.map((item, position) => {
+              const selected = active.id === item.id
+              const video = selected ? active : item
+              const nearby = Math.abs(position - index) <= 1
+              return (
+                <div className='viewer-slide' key={item.id} data-active={selected || undefined}
+                  inert={!selected}>
+                  {selected && playbackError ? <p role='status'>{playbackError}</p> :
+                    nearby && video.video ? <video src={video.video} poster={video.poster}
+                      playsInline muted loop controls={selected} preload={selected ? 'auto' : 'metadata'}
+                      aria-label={video.title} onError={() => {
+                        if (currentId.current === item.id) setPlaybackError('This video could not be played.')
+                      }} /> :
+                      video.poster ? <img src={video.poster} alt='' /> :
+                        <p role={selected ? 'status' : undefined}>{selected ? 'Loading video…' : item.title}</p>}
+                </div>
+              )
+            })}
           </div>
           <div className='viewer-details'>
             <div><small>{active.topic}</small><h2>{active.title}</h2></div>
             <button type='button' className='viewer-action' aria-pressed={isSaved} onClick={() => toggleBookmark(active)}>
               <Bookmark size={20} fill={isSaved ? 'currentColor' : 'none'} /> {isSaved ? 'Saved' : 'Save'}
             </button>
-            {items.length > 1 && index >= 0 && <p className='viewer-position' aria-live='polite'>{index + 1} / {items.length}</p>}
+            {playlist.length > 1 && index >= 0 && <p className='viewer-position' aria-live='polite'>{index + 1} / {playlist.length}</p>}
           </div>
         </div>}
       </dialog>
     </section>
   )
+}
+
+function scrollToSlide(viewport: HTMLDivElement, index: number) {
+  viewport.scrollTo({
+    top: index * viewport.clientHeight,
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+  })
 }

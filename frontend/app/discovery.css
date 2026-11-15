@@ -17,8 +17,9 @@
 .discovery-viewer { position: fixed; inset: 0; width: 100%; height: 100%; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; color: white; background: #130d21; }
 .discovery-viewer::backdrop, .publish-dialog::backdrop { background: #130d21c9; }
 .discovery-viewer-layout { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 260px); align-items: center; gap: 24px; width: min(100%, 830px); height: 100%; padding: 12px 26px; margin: auto; }
-.discovery-player { display: grid; place-items: center; min-height: 0; height: 100%; }
-.discovery-player video { display: block; width: 100%; height: 100%; max-height: calc(100dvh - 24px); object-fit: contain; }
+.discovery-player { min-height: 0; height: 100%; overflow: hidden auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; scrollbar-width: none; touch-action: pan-y; }
+.viewer-slide { display: grid; place-items: center; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+.viewer-slide video, .viewer-slide img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; }
 .viewer-details h2 { font-size: clamp(21px, 4vw, 31px); line-height: 1.1; margin: 4px 0 20px; }
 .viewer-details small { color: #ccb5fc; }
 .viewer-close, .viewer-action { display: inline-flex; gap: 8px; align-items: center; justify-content: center; padding: 9px 13px; min-height: 43px; border-radius: 9px; background: #33234d; color: white; font-weight: 700; }
@@ -55,16 +56,14 @@
 
 .discovery-library section > .discovery-grid { margin-top: 18px; }
 .topic-grid { gap: 11px; }
-.topic-card { display: block; width: 100%; aspect-ratio: 1; position: relative; overflow: hidden; text-align: left; border-radius: 12px; color: white; }
-.topic-card strong { position: absolute; bottom: 13px; left: 13px; right: 5px; font-size: clamp(11px, 2.2vw, 22px); overflow-wrap: anywhere; line-height: 1.1; }
-.topic-card-art { position: absolute; top: 18%; left: 22%; width: 58%; height: 52%; opacity: .62; }
-.topic-card-arrow { position: absolute; top: 10px; right: 10px; }
+.topic-card { display: block; width: 100%; aspect-ratio: 1; position: relative; isolation: isolate; overflow: hidden; text-align: left; border-radius: 12px; color: white; background: #24183c; }
+.topic-card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #0b0a1644, transparent 25%, transparent 44%, #0b0a16e8); pointer-events: none; }
+.topic-card strong { position: absolute; z-index: 1; bottom: 13px; left: 13px; right: 5px; font-size: clamp(11px, 2.2vw, 22px); overflow-wrap: anywhere; line-height: 1.1; }
+.topic-card-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.topic-card-arrow { position: absolute; z-index: 1; top: 10px; right: 10px; }
 .topic-card:hover { box-shadow: 0 0 0 2px var(--purple); }
 .discovery-topic-header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 13px; }
 .discovery-topic-header h2 { font-size: clamp(19px, 4vw, 27px); font-weight: 800; }
-.discovery-player { position: relative; }
-.viewer-swipe-area { position: absolute; inset: 0 0 65px; touch-action: none; cursor: grab; user-select: none; }
-.viewer-swipe-area:active { cursor: grabbing; }
 .viewer-details .viewer-position { color: #e3d8f1; font-variant-numeric: tabular-nums; margin: 10px 0 0; }
 body:has(.discovery-viewer[open]) { overflow: hidden; }
 
