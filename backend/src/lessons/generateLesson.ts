@@ -17,7 +17,7 @@ Grounding rules:
 Lesson fields:
 - title: under 70 characters. hook: one sentence, the key takeaway.
 - explanation: 2-4 short paragraphs in plain language, under 1200 characters.
-- narration: a voiceover script of about 40-60 seconds that a narrator reads aloud.
+- narration: a voiceover script of about 30-40 seconds (70-100 words) that a narrator reads aloud.
 - captions: 3-6 short on-screen captions (under 90 characters each) that follow the narration.
 - scenePrompt: one visual metaphor for the idea, described as a cinematic shot (subject, setting, camera motion, mood). Vertical 9:16 framing, about 6 seconds. No text, letters, logos, brands or real people.
 - quiz: one question testing understanding (not trivia), 3 or 4 distinct options, exactly one correct; answerIndex is its 0-based index; explanation says why it is correct, citing the source idea.
@@ -99,8 +99,10 @@ export async function generateLesson(input: GenerateLessonInput): Promise<Lesson
 /** Token usage per Opus call, for cost tracking (no content is logged). */
 export function logUsage(kind: string, response: Anthropic.Beta.BetaMessage): void {
   const u = response.usage;
+  const thinking = (u as { output_tokens_details?: { thinking_tokens?: number } }).output_tokens_details?.thinking_tokens;
   console.log(
     `[opus:usage] ${kind} model=${response.model} stop=${response.stop_reason} in=${u.input_tokens} out=${u.output_tokens}` +
+      `${thinking !== undefined ? ` thinking=${thinking}` : ""}` +
       ` cache_write=${u.cache_creation_input_tokens ?? 0} cache_read=${u.cache_read_input_tokens ?? 0}`,
   );
 }
