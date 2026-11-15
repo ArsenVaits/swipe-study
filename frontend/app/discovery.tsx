@@ -179,7 +179,23 @@ export default function Discovery({
         </ul> : <p className='empty-library' role='status'>No topics match your search.</p>)}
       </>}
       {mode === 'saved' && items.length > 0 && <h2 className='saved-section-title'>Bookmarked videos</h2>}
-      {items.length ? (
+      {mode === 'saved' && items.length > 0 ? (
+        <ul className='saved-video-grid'>
+          {items.map(item => (
+            <li key={item.id} className='saved-video-card'>
+              <video controls playsInline preload='none' src={item.video} poster={item.poster} aria-label={item.title} />
+              <div className='saved-video-info'>
+                <button type='button' className='saved-link' onClick={event => openVideo(item, event.currentTarget)}>
+                  <strong>{item.title}</strong><span>{item.topic} · Open viewer</span>
+                </button>
+                <button type='button' className='icon-control' aria-label={'Remove ' + item.title} onClick={() => toggleBookmark(item)}>
+                  <Bookmark size={17} fill='currentColor' />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : items.length ? (
         <ul className='discovery-grid'>
           {items.map(item => (
             <li key={item.id}>

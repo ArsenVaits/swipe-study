@@ -59,3 +59,29 @@ html:has(.site-shell) {
   .site-shell .header-inner { padding-inline: 10px; }
   .site-shell .header-inner nav button { min-height: 46px; }
 }
+
+.saved-video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  gap: 14px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+}
+.saved-video-card {
+  min-width: 0;
+  max-width: 300px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+}
+.saved-video-card video, .saved-video-placeholder {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  background: #08080a;
+  object-fit: contain;
+}
+.saved-video-placeholder { display: grid; place-content: center; text-align: center; padding: 16px; }
+.saved-video-info { display: flex; align-items: start; gap: 8px; padding: 12px; }

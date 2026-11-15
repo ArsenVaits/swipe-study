@@ -494,6 +494,15 @@ export default function Studio({
     )
   }
 
+  useEffect(() => {
+    if (tab !== 'saved') return
+    for (const item of library) {
+      if (item.sample || clips[item.id]) continue
+      if (item.jobId) void loadVideo(item.jobId)
+      else void renderClip(item)
+    }
+  }, [tab, library, clips])
+
   function openSaved(item: Entry) {
     if (!entries.some(record => record.id === item.id)) {
       setEntries(previous => [item, ...previous])
@@ -576,34 +585,36 @@ export default function Studio({
           <Discovery mode='saved' />
           <h2 className='saved-section-title'>Your lessons</h2>
           {library.length ? (
-            <ul className='saved-list'>
-              {library.map(item => (
-                <li key={item.id}>
-                  <Clapperboard size={20} aria-hidden='true' />
-                  <button className='saved-link' type='button' onClick={() => openSaved(item)}>
-                    <strong>{item.lesson.title}</strong>
-                    <span>
-                      {item.name} · Page {item.lesson.source.page}
-                      {clips[item.id]?.video || item.sample ? ' · Video ready' :
-                        clips[item.id]?.error ? ' · Video unavailable' :
-                        clips[item.id] ? ' · Rendering video' : ''}
-                    </span>
-                  </button>
-                  <button
-                    type='button'
-                    className='icon-control'
-                    aria-label={'Remove ' + item.lesson.title}
-                    onClick={() =>
-                      updateLibrary(
-                        previous => previous.filter(record => record.id !== item.id),
-                        'Lesson removed from Saved.'
-                      )
-                    }
-                  >
-                    <Trash2 size={17} />
-                  </button>
+            <ul className='saved-video-grid'>
+              {library.map(item => {
+                const clip = clips[item.id]
+                const media = item.sample ? sampleMedia[item.sample - 1] : { video: clip?.video, poster: undefined }
+                return <li key={item.id} className='saved-video-card'>
+                  {media.video ? (
+                    <video controls playsInline preload='none' src={media.video} poster={media.poster} aria-label={item.lesson.title} />
+                  ) : (
+                    <div className='saved-video-placeholder'>
+                      <p>{clip?.error || 'Waiting for the video…'}</p>
+                      {clip?.error && (clip.retryStatus || !item.jobId) && (
+                        <button type='button' className='secondary' onClick={() => {
+                          if (item.jobId) void loadVideo(item.jobId)
+                          else void renderClip(item)
+                        }}>Try again</button>
+                      )}
+                    </div>
+                  )}
+                  <div className='saved-video-info'>
+                    <button className='saved-link' type='button' onClick={() => openSaved(item)}>
+                      <strong>{item.lesson.title}</strong>
+                      <span>{item.name} · Page {item.lesson.source.page}</span>
+                    </button>
+                    <button type='button' className='icon-control' aria-label={'Remove ' + item.lesson.title}
+                      onClick={() => updateLibrary(previous => previous.filter(record => record.id !== item.id), 'Lesson removed from Saved.')}>
+                      <Trash2 size={17} />
+                    </button>
+                  </div>
                 </li>
-              ))}
+              })}
             </ul>
           ) : (
             <div className='empty-library'>
