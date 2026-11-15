@@ -159,7 +159,21 @@ GET /api/lesson-jobs/:jobId  каждые 3–5 с
 
 Длина каждого ролика — от 35 до 60 секунд.
 
-### 3.4. `GET /api/health` — проверка сервера
+### 3.4. `GET /api/lessons?sessionId=…` — восстановить ленту после перезагрузки
+
+Возвращает всё, что сделала эта сессия браузера, до 60 уроков: новые загрузки сверху, уроки серии в порядке плана. Уроки, у которых ещё рендерится видео, обновляются так же, как в `GET /api/lesson-jobs/:id`. Серии, которые ещё генерируются, приходят в `sets`, их нужно продолжить опрашивать.
+
+```json
+{
+  "lessons": [{ "jobId": "…", "status": "ready", "lesson": { … }, "videoUrl": "/api/media/…mp4", "error": null,
+                "sourceTitle": "kafka.pdf", "setId": "…", "createdAt": 1794713000000 }],
+  "sets": [{ "setId": "…", "status": "generating", "planned": 4, "titles": [ … ], "lessons": [ … ], "complete": false, "error": null }]
+}
+```
+
+Фронт вызывает этот маршрут при загрузке страницы и восстанавливает ленту.
+
+### 3.5. `GET /api/health` — проверка сервера
 
 ```json
 { "ok": true, "videoProvider": "mock", "lessonAi": "configured", "tts": "none" }

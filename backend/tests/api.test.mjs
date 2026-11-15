@@ -152,6 +152,16 @@ test("lesson sets validate input, need AI configuration and 404 unknown ids", as
   assert.equal((await missing.json()).error.code, "NOT_FOUND");
 });
 
+test("a session's lessons can be listed to rebuild the feed after a reload", async () => {
+  const response = await fetch(origin + "/api/lessons?sessionId=test-session");
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.ok(body.lessons.some((l) => l.jobId === jobId && l.videoUrl === "/demo/lesson.mp4" && l.sourceTitle === "Existing lesson"));
+  assert.deepEqual(body.sets, []);
+  assert.equal((await (await fetch(origin + "/api/lessons?sessionId=someone-else")).json()).lessons.length, 0);
+  assert.equal((await fetch(origin + "/api/lessons")).status, 400);
+});
+
 test("bundled demo assets remain accessible", async () => {
   const response = await fetch(origin + "/demo/lesson.mp4", { method: "HEAD" });
   assert.equal(response.status, 200);

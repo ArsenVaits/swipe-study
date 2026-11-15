@@ -6,12 +6,14 @@ import {
   getLessonJob,
   getSessionId,
   LessonApiError,
+  listSessionLessons,
   lessonErrorMessage,
   pollLessonJob,
   pollLessonSet,
   toLesson,
   type LessonJob,
-  type LessonSet
+  type LessonSet,
+  type SessionLesson
 } from '@/lib/lesson-api'
 import { placeSeries } from '@/lib/series'
 import {
@@ -125,7 +127,10 @@ export default function Studio() {
     } catch {
       setLibrary([])
     }
+    const restore = new AbortController()
+    void restoreSession(restore.signal)
     return () => {
+      restore.abort()
       creation.current?.abort()
       videoRequests.current.forEach(request => request.abort())
       if (currentPdf.current?.pdf) void currentPdf.current.pdf.loadingTask.destroy()
@@ -285,6 +290,74 @@ export default function Studio() {
     }
   }
 
+  /** Shows the job's video state: ready video, error, or a loading state that keeps polling. */
+  function clipFor(job: LessonJob): Clip {
+    if (job.status === 'ready' && job.videoUrl) return { video: job.videoUrl }
+    if (job.status === 'failed')
+      return {
+        error:
+          job.error?.code === 'VIDEO_LIMIT_REACHED'
+            ? 'You have reached the video limit for this demo.'
+            : 'The server could not render this video.'
+      }
+    return {}
+  }
+
+  /**
+   * Follows a lesson series: every lesson goes to the top of the feed in plan order as soon as it
+   * exists, and video states come from the same poll. Used after "Create my lessons" and after a reload.
+   */
+  async function followSeries(set: LessonSet, request: AbortController, name: string, url?: string, focusFirst = true) {
+    const order: string[] = []
+    const shown = new Set<string>()
+    const apply = (current: LessonSet) => {
+      if (request.signal.aborted) return
+      const fresh: Entry[] = []
+      for (const job of current.lessons) {
+        if (!order.includes(job.jobId)) order.push(job.jobId)
+        if (!job.lesson || shown.has(job.jobId)) continue
+        shown.add(job.jobId)
+        const item: Entry = { id: job.jobId, jobId: job.jobId, lesson: toLesson(job.lesson), name }
+        if (url) origins.current.set(item.id, url)
+        fresh.push(item)
+      }
+      const ready = current.lessons.filter(job => job.lesson).length
+      setProgress(
+        current.status === 'planning'
+          ? 'Reading your PDF and planning the lessons…'
+          : current.planned
+            ? ready + ' of ' + current.planned + (current.planned === 1 ? ' lesson' : ' lessons') + ' ready. The rest appear in the feed as they finish.'
+            : 'Writing the lessons…'
+      )
+      if (fresh.length) {
+        const first = shown.size === fresh.length
+        setEntries(previous => placeSeries(previous, order.filter(id => shown.has(id)), fresh))
+        updateLibrary(previous => placeSeries(previous, order.filter(id => shown.has(id)), fresh))
+        if (first && focusFirst) {
+          setTab('feed')
+          goTo(fresh[0].id, false)
+          requestAnimationFrame(() =>
+            document.getElementById('lesson-feed')?.scrollIntoView({ block: 'nearest' })
+          )
+        }
+      }
+      setClips(previous => {
+        const next = { ...previous }
+        for (const job of current.lessons)
+          if (job.lesson && !previous[job.jobId]?.video) next[job.jobId] = clipFor(job)
+        return next
+      })
+    }
+    apply(set)
+    const finished = await pollLessonSet(set, request.signal, apply)
+    if (request.signal.aborted) return
+    if (finished.status === 'failed' && !finished.lessons.some(job => job.lesson)) {
+      setError(lessonErrorMessage(finished.error?.code))
+    } else if (finished.status === 'failed' && finished.error) {
+      setNotice(lessonErrorMessage(finished.error.code))
+    }
+  }
+
   async function createLesson() {
     if (!source || busy || creation.current) return
     setError('')
@@ -297,60 +370,6 @@ export default function Studio() {
     creation.current = request
     setCreating(true)
     const document_ = source
-    // Lessons of this series, in plan order; each is added to the feed the moment it exists.
-    const order: string[] = []
-    const shown = new Set<string>()
-    const apply = (set: LessonSet) => {
-      if (request.signal.aborted) return
-      const fresh: Entry[] = []
-      for (const job of set.lessons) {
-        if (!order.includes(job.jobId)) order.push(job.jobId)
-        if (!job.lesson || shown.has(job.jobId)) continue
-        shown.add(job.jobId)
-        const item: Entry = { id: job.jobId, jobId: job.jobId, lesson: toLesson(job.lesson), name: document_.name }
-        origins.current.set(item.id, document_.url)
-        fresh.push(item)
-      }
-      const ready = set.lessons.filter(job => job.lesson).length
-      setProgress(
-        set.status === 'planning'
-          ? 'Reading your PDF and planning the lessons…'
-          : set.planned
-            ? ready + ' of ' + set.planned + (set.planned === 1 ? ' lesson' : ' lessons') + ' ready. The rest appear in the feed as they finish.'
-            : 'Writing the lessons…'
-      )
-      if (fresh.length) {
-        const first = shown.size === fresh.length
-        setEntries(previous => placeSeries(previous, order.filter(id => shown.has(id)), fresh))
-        updateLibrary(previous => placeSeries(previous, order.filter(id => shown.has(id)), fresh))
-        if (first) {
-          setTab('feed')
-          goTo(fresh[0].id, false)
-          requestAnimationFrame(() =>
-            document.getElementById('lesson-feed')?.scrollIntoView({ block: 'nearest' })
-          )
-        }
-      }
-      // Video state for every lesson of the series comes from the same poll.
-      setClips(previous => {
-        const next = { ...previous }
-        for (const job of set.lessons) {
-          if (!job.lesson || previous[job.jobId]?.video) continue
-          next[job.jobId] =
-            job.status === 'ready' && job.videoUrl
-              ? { video: job.videoUrl }
-              : job.status === 'failed'
-                ? {
-                    error:
-                      job.error?.code === 'VIDEO_LIMIT_REACHED'
-                        ? 'You have reached the video limit for this demo.'
-                        : 'The server could not render this video.'
-                  }
-                : {}
-        }
-        return next
-      })
-    }
     try {
       setProgress('Reading every page of your PDF…')
       const reader = await import('@/lib/pdf')
@@ -368,14 +387,7 @@ export default function Studio() {
         },
         request.signal
       )
-      apply(created)
-      const finished = await pollLessonSet(created, request.signal, apply)
-      if (request.signal.aborted) return
-      if (finished.status === 'failed' && !finished.lessons.some(job => job.lesson)) {
-        setError(lessonErrorMessage(finished.error?.code))
-      } else if (finished.status === 'failed' && finished.error) {
-        setNotice(lessonErrorMessage(finished.error.code))
-      }
+      await followSeries(created, request, document_.name, document_.url)
     } catch (cause) {
       if (request.signal.aborted) return
       setError(
@@ -388,6 +400,52 @@ export default function Studio() {
       if (!request.signal.aborted) {
         setCreating(false)
         setProgress('')
+      }
+    }
+  }
+
+  /** After a reload: rebuild the feed from the server, then resume polling unfinished videos and series. */
+  async function restoreSession(signal: AbortSignal) {
+    let data: { lessons: SessionLesson[]; sets: LessonSet[] }
+    try {
+      data = await listSessionLessons(getSessionId(), signal)
+    } catch {
+      return // server unreachable: keep the sample feed and the local library
+    }
+    if (signal.aborted) return
+    const inOpenSet = new Set(data.sets.flatMap(set => set.lessons.map(job => job.jobId)))
+    const items: Entry[] = data.lessons
+      .filter(job => job.lesson)
+      .map(job => ({ id: job.jobId, jobId: job.jobId, lesson: toLesson(job.lesson!), name: job.sourceTitle }))
+    if (items.length) {
+      const ids = new Set(items.map(item => item.id))
+      setEntries(previous => [...items, ...previous.filter(item => !ids.has(item.id))])
+      updateLibrary(previous => [...items.filter(item => !previous.some(saved => saved.id === item.id)), ...previous])
+      setClips(previous => {
+        const next = { ...previous }
+        for (const job of data.lessons) if (job.lesson && !inOpenSet.has(job.jobId)) next[job.jobId] = clipFor(job)
+        return next
+      })
+      goTo(items[0].id, false)
+    }
+    for (const job of data.lessons)
+      if (job.lesson && job.status === 'rendering_video' && !inOpenSet.has(job.jobId)) void loadVideo(job.jobId, job)
+    for (const set of data.sets) {
+      if (creation.current) break
+      const request = new AbortController()
+      signal.addEventListener('abort', () => request.abort())
+      creation.current = request
+      setCreating(true)
+      try {
+        await followSeries(set, request, set.lessons[0] ? (data.lessons.find(job => job.jobId === set.lessons[0].jobId)?.sourceTitle ?? 'Your PDF') : 'Your PDF', undefined, !items.length)
+      } catch {
+        /* polling stopped; lessons already shown stay */
+      } finally {
+        creation.current = null
+        if (!request.signal.aborted) {
+          setCreating(false)
+          setProgress('')
+        }
       }
     }
   }

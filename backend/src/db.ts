@@ -69,6 +69,7 @@ export interface JobRecord {
   videoUrl: string | null;
   error: { stage: ErrorStage; code: string; message: string } | null;
   providerCheckedAt: number | null;
+  setId: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -91,6 +92,7 @@ function fromRow(r: Row): JobRecord {
       ? { stage: r.error_stage as ErrorStage, code: r.error_code as string, message: (r.error_message as string) ?? "" }
       : null,
     providerCheckedAt: (r.provider_checked_at as number) ?? null,
+    setId: (r.set_id as string) ?? null,
     createdAt: r.created_at as number,
     updatedAt: r.updated_at as number,
   };
@@ -247,4 +249,26 @@ export function failInterruptedSets(): number {
     )
     .run(Date.now());
   return Number(r.changes);
+}
+
+/** A browser session's lessons for the feed: newest upload first, a series' lessons in plan order. */
+export function listJobsForSession(sessionId: string, limit: number): JobRecord[] {
+  const rows = db
+    .prepare(
+      `SELECT j.* FROM lesson_jobs j LEFT JOIN lesson_sets s ON s.id = j.set_id
+       WHERE j.session_id = ?
+       ORDER BY COALESCE(s.created_at, j.created_at) DESC, COALESCE(j.set_index, 0) ASC
+       LIMIT ?`,
+    )
+    .all(sessionId, limit) as Row[];
+  return rows.map(fromRow);
+}
+
+/** Series of a session that are still planning or generating lessons. */
+export function openSetIdsForSession(sessionId: string): string[] {
+  return (
+    db
+      .prepare("SELECT id FROM lesson_sets WHERE session_id = ? AND status IN ('planning', 'generating') ORDER BY created_at DESC")
+      .all(sessionId) as Row[]
+  ).map((r) => r.id as string);
 }

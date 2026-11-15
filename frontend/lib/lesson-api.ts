@@ -155,6 +155,20 @@ export async function pollLessonSet(set: LessonSet, signal: AbortSignal, onUpdat
   return current;
 }
 
+export type SessionLesson = LessonJob & { sourceTitle: string; setId: string | null; createdAt: number };
+
+/** Everything this browser session made (newest first), so a reloaded page can rebuild its feed. */
+export async function listSessionLessons(sessionId: string, signal: AbortSignal) {
+  const response = await fetch("/api/lessons?sessionId=" + encodeURIComponent(sessionId), {
+    cache: "no-store",
+    signal: AbortSignal.any([signal, AbortSignal.timeout(20_000)]),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new LessonApiError(response.status, body?.error?.code);
+  if (!Array.isArray(body?.lessons) || !Array.isArray(body?.sets)) throw new Error("Invalid lesson list response");
+  return body as { lessons: SessionLesson[]; sets: LessonSet[] };
+}
+
 export function toLesson(data: ApiLesson): Lesson {
   return {
     title: data.title,
