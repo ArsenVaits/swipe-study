@@ -12,7 +12,7 @@ export function addFinishingLayer(html: string, duration: number): string {
   const layer = `
 <div id="hf-finish" class="clip" data-start="0" data-duration="${duration}" data-layout-ignore aria-hidden="true"
      style="position:absolute;inset:0;pointer-events:none;z-index:9000;overflow:hidden">
-  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 85% 70% at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.30) 100%)"></div>
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 85% 70% at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.16) 100%)"></div>
   <div id="hf-grain" style="position:absolute;left:-25%;top:-25%;width:150%;height:150%;opacity:0.075;mix-blend-mode:overlay;
        background:url(&quot;${NOISE}&quot;);background-size:256px 256px;
        animation:hf-grain ${GRAIN_STEP_S * 4}s steps(1) ${Math.ceil(iterations / 4)} both"></div>

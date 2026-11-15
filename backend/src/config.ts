@@ -27,7 +27,8 @@ const EnvSchema = z.object({
 
   // HyperFrames: Opus writes an HTML+GSAP composition, the HyperFrames CLI renders it to MP4.
   HYPERFRAMES_MODEL: z.string().default("claude-opus-5-5"),
-  HYPERFRAMES_EFFORT: z.enum(["low", "medium", "high"]).default("medium"),
+  // First draft. "low" keeps Sonnet's up-front thinking short: the DESIGN PLAN is written out anyway.
+  HYPERFRAMES_EFFORT: z.enum(["low", "medium", "high"]).default("low"),
   // Effort for fix rounds and the visual review: targeted edits need less thinking than the first draft.
   HYPERFRAMES_FIX_EFFORT: z.enum(["low", "medium", "high"]).default("low"),
   HYPERFRAMES_FPS: z.coerce.number().int().min(24).max(60).default(30),

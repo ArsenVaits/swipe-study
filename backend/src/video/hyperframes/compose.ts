@@ -63,37 +63,42 @@ export class CompositionWriter {
 
   /**
    * Shows the model phone-size frames of its own render and asks for a harsh visual review.
-   * Returns the corrected HTML, or null when it approves the video as is.
+   * Runs as a separate short request (current HTML + frames) without up-front thinking, so it
+   * answers in seconds with a few targeted edits. Returns the corrected HTML, or null when approved.
    */
   async review(frames: Array<{ time: number; data: string }>): Promise<string | null> {
     const content: Anthropic.Beta.BetaContentBlockParam[] = [
       {
         type: "text",
         text:
-          "Here are frames of your composition as rendered, at phone size, in time order. Review them as a harsh creative director " +
-          "of a top motion-design studio. P0 problems: a frame where the content is small or leaves a large empty area (the hero must " +
-          "fill the band from y=200 to y=1300), text that is unreadable on a phone, overlaps or crops that are not intended, a frame " +
-          "that reads as a slide or a template, any generated-design default from the list in your instructions (cream + serif + " +
-          "terracotta, near-black + one acid accent, identical rounded cards, one accented word in a headline, small mono labels, " +
-          "everything centred and tiny). P1: no signature device, weak contrast in scale or rhythm, a beat that does not explain its " +
-          "idea at a glance. First list each real problem as one line: `t=… · where · problem → exact change`, then fix the ones " +
-          "that matter. " +
+          "Below is your current composition and frames of it as rendered, at phone size, in time order. Review them as a harsh " +
+          "creative director of a top motion-design studio. P0: content small or leaving a large empty area (the hero must fill the " +
+          "band from y=200 to y=1300), text unreadable on a phone, unintended overlaps or crops, a frame that reads as a slide or a " +
+          "template, a generated-design default from your instructions. P1: weak contrast in scale or rhythm, a beat that does not " +
+          "explain its idea at a glance. Write each problem as one short line `t=… · where · problem`, then fix only the most " +
+          "important ones with at most 6 edit blocks. " +
           EDIT_FORMAT_HELP +
-          " If the video is already clean and premium, reply with the single word APPROVED and nothing else.",
+          " Edits apply to the HTML below. If the video is already clean and premium, reply with the single word APPROVED.\n\n" +
+          `<current_html>\n${this.raw}\n</current_html>`,
       },
     ];
     for (const f of frames) {
       content.push({ type: "text", text: `t=${f.time.toFixed(1)} s` });
       content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: f.data } });
     }
-    this.messages.push({ role: "user", content });
-    const rev = await this.revise("compose-review");
+    const response = await this.call([{ role: "user", content }], "compose-review", config.HYPERFRAMES_FIX_EFFORT, true);
+    const rev = this.applyReply(textOf(response), "compose-review");
     return rev.approved ? null : rev.raw;
   }
 
-  /** Applies the reply's edits (or takes a full document) to the current raw document. */
+  /** Fix round inside the drafting conversation: the reply's edits apply to the current raw document. */
   private async revise(kind: string): Promise<Revision> {
     const { text } = await this.ask(kind, config.HYPERFRAMES_FIX_EFFORT);
+    return this.applyReply(text, kind);
+  }
+
+  /** Applies a reply's edits (or takes a full document) to the current raw document. */
+  private applyReply(text: string, kind: string): Revision {
     const edits = parseEdits(text);
     if (edits.length) {
       const res = applyEdits(this.raw, edits);
@@ -101,7 +106,7 @@ export class CompositionWriter {
       if (res.failed.length) console.warn(`[hyperframes] ${kind}: edits that did not match:`, res.failed);
       if (res.applied > 0) {
         this.raw = res.doc;
-        if (res.failed.length) {
+        if (res.failed.length && kind === "compose-fix") {
           // Keep the model's picture of its document accurate for the next round.
           this.messages.push({
             role: "user",
@@ -122,17 +127,31 @@ export class CompositionWriter {
     return { raw: null, approved: false };
   }
 
+  /** A turn in the drafting conversation. */
   private async ask(kind: string, effort: Effort): Promise<{ text: string }> {
+    const response = await this.call(this.messages, kind, effort, false);
+    // Keep the full assistant turn (thinking included) so later rounds continue the same reasoning.
+    this.messages.push({ role: "assistant", content: response.content });
+    return { text: textOf(response) };
+  }
+
+  private async call(
+    messages: Anthropic.Beta.BetaMessageParam[],
+    kind: string,
+    effort: Effort,
+    noThinking: boolean,
+  ): Promise<Anthropic.Beta.BetaMessage> {
     let response: Anthropic.Beta.BetaMessage;
     try {
       // Streaming: the first draft is a long output, and streaming avoids HTTP timeouts.
       response = await client.beta.messages
         .stream({
           model: config.HYPERFRAMES_MODEL,
-          max_tokens: 32000,
+          max_tokens: noThinking ? 12000 : 32000,
           system: [{ type: "text", text: composeSystemPrompt(config.HYPERFRAMES_CAPTIONS), cache_control: { type: "ephemeral" } }],
-          messages: this.messages,
+          messages,
           output_config: { effort },
+          ...(noThinking ? noThinkingParam(config.HYPERFRAMES_MODEL) : {}),
           betas: ["server-side-fallback-2026-07-01"],
           fallbacks: "default",
         })
@@ -142,19 +161,26 @@ export class CompositionWriter {
       console.error("[hyperframes] Opus request failed:", status ?? "", err instanceof Error ? err.message : err);
       throw new ComposeError("Opus request failed");
     }
-
     logUsage(kind, response);
     if (response.stop_reason === "refusal") throw new ComposeError("Opus declined to write the composition");
     if (response.stop_reason === "max_tokens") throw new ComposeError("Composition was cut off (max_tokens)");
-
-    // Keep the full assistant turn (thinking included) so later rounds continue the same reasoning.
-    this.messages.push({ role: "assistant", content: response.content });
-    const text = response.content
-      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-    return { text };
+    return response;
   }
+}
+
+function textOf(response: Anthropic.Beta.BetaMessage): string {
+  return response.content
+    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+}
+
+/**
+ * Turns off up-front thinking where the model supports it (Sonnet 5.5: `between_tools`).
+ * Other models keep adaptive thinking (their default), which `effort: low` keeps short.
+ */
+function noThinkingParam(model: string): Record<string, unknown> {
+  return model.startsWith("claude-sonnet-5-5") ? { thinking: { type: "between_tools" } } : {};
 }
 
 function briefFor(lesson: Lesson, voice: Voiceover, audio: AudioAssets): string {
