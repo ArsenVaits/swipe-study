@@ -33,6 +33,8 @@ const EnvSchema = z.object({
   HYPERFRAMES_FPS: z.coerce.number().int().min(24).max(60).default(30),
   HYPERFRAMES_QUALITY: z.enum(["draft", "standard", "high"]).default("standard"),
   HYPERFRAMES_MAX_PARALLEL_RENDERS: intFromEnv(1),
+  // Chrome capture workers per render. Measured on the 20-core prod server: 6 (auto) 32 s, 12 → 26 s, 16 no gain.
+  HYPERFRAMES_RENDER_WORKERS: intFromEnv(12),
   HYPERFRAMES_RENDER_TIMEOUT_MS: intFromEnv(10 * 60 * 1000),
   // 0..2 rounds where Opus fixes what `hyperframes check` found.
   // Burned-in subtitles of the narration. Off: the frontend shows captions itself.

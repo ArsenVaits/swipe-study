@@ -227,7 +227,12 @@ async function check(workDir: string): Promise<{ blocking: number; problems: str
 async function render(workDir: string, outFile: string): Promise<boolean> {
   await rm(outFile, { force: true });
   const res = await hyperframes(
-    ["render", workDir, "-o", outFile, "--fps", String(config.HYPERFRAMES_FPS), "--quality", config.HYPERFRAMES_QUALITY],
+    [
+      "render", workDir, "-o", outFile,
+      "--fps", String(config.HYPERFRAMES_FPS),
+      "--quality", config.HYPERFRAMES_QUALITY,
+      "--workers", String(config.HYPERFRAMES_RENDER_WORKERS),
+    ],
     { timeoutMs: config.HYPERFRAMES_RENDER_TIMEOUT_MS, logFile: path.join(workDir, "render.log") },
   );
   const ok = res.code === 0 && !res.timedOut && (await stat(outFile).catch(() => null))?.size;
