@@ -31,6 +31,7 @@ import {
   Clapperboard,
   FileText,
   Layers3,
+  Library,
   LoaderCircle,
   Plus,
   ShieldCheck,
@@ -115,7 +116,8 @@ export default function Studio() {
 
   useEffect(() => {
     try {
-      setLibrary(JSON.parse(localStorage.getItem(archive) || '[]'))
+      const saved = JSON.parse(localStorage.getItem(archive) || '[]')
+      if (Array.isArray(saved)) setLibrary(saved)
     } catch {
       setLibrary([])
     }
@@ -318,6 +320,7 @@ export default function Studio() {
       }
       origins.current.set(item.id, source.url)
       setEntries(previous => [item, ...previous])
+      updateLibrary(previous => [item, ...previous.filter(record => record.id !== item.id)])
       setTab('feed')
       goTo(item.id, false)
       void loadVideo(job.jobId, job)
@@ -337,8 +340,10 @@ export default function Studio() {
     }
   }
 
-  function updateLibrary(next: Entry[], message: string) {
+  function updateLibrary(change: (previous: Entry[]) => Entry[], message = '') {
     try {
+      const stored = JSON.parse(localStorage.getItem(archive) || '[]')
+      const next = change(Array.isArray(stored) ? stored : [])
       localStorage.setItem(archive, JSON.stringify(next))
       setLibrary(next)
       setNotice(message)
@@ -349,8 +354,10 @@ export default function Studio() {
 
   function toggleSave() {
     updateLibrary(
-      isSaved ? library.filter(item => item.id !== entry.id) : [entry, ...library],
-      isSaved ? 'Lesson removed from saved lessons.' : 'Lesson saved.'
+      previous => isSaved
+        ? previous.filter(item => item.id !== entry.id)
+        : [entry, ...previous.filter(item => item.id !== entry.id)],
+      isSaved ? 'Lesson removed from your library.' : 'Lesson added to your library.'
     )
   }
 
@@ -407,7 +414,7 @@ export default function Studio() {
                 setNotice('')
               }}
             >
-              <Bookmark size={16} /> <span>Saved</span>
+              <Library size={16} /> <span>Library</span>
             </button>
           </nav>
           <button
@@ -436,17 +443,20 @@ export default function Studio() {
       </span>
       {tab === 'library' ? (
         <main className='library'>
-          <h1>Saved lessons</h1>
-          <p>Pick up where you left off. These lessons are saved in this browser.</p>
+          <h1>Library</h1>
+          <p>Open a video lesson to watch it again or revisit its quiz.</p>
           {library.length ? (
             <ul className='saved-list'>
               {library.map(item => (
                 <li key={item.id}>
-                  <Bookmark size={20} />
+                  <Clapperboard size={20} aria-hidden='true' />
                   <button className='saved-link' type='button' onClick={() => openSaved(item)}>
                     <strong>{item.lesson.title}</strong>
                     <span>
                       {item.name} · Page {item.lesson.source.page}
+                      {clips[item.id]?.video || item.sample ? ' · Video ready' :
+                        clips[item.id]?.error ? ' · Video unavailable' :
+                        clips[item.id] ? ' · Rendering video' : ''}
                     </span>
                   </button>
                   <button
@@ -455,8 +465,8 @@ export default function Studio() {
                     aria-label={'Remove ' + item.lesson.title}
                     onClick={() =>
                       updateLibrary(
-                        library.filter(record => record.id !== item.id),
-                        'Lesson removed.'
+                        previous => previous.filter(record => record.id !== item.id),
+                        'Lesson removed from your library.'
                       )
                     }
                   >
@@ -467,9 +477,9 @@ export default function Studio() {
             </ul>
           ) : (
             <div className='empty-library'>
-              <Bookmark size={30} />
-              <h2>No saved lessons yet</h2>
-              <p>Save a lesson from the feed to find it here.</p>
+              <Library size={30} aria-hidden='true' />
+              <h2>No videos yet</h2>
+              <p>Create a lesson from a PDF or save a lesson from the feed.</p>
               <button
                 type='button'
                 className='secondary'
