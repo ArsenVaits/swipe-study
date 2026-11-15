@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
+import { detect } from "tinyld";
 import { config } from "../config.ts";
 
 // Voiceover for generated videos. Every provider returns raw PCM (24 kHz, 16-bit, mono),
@@ -49,6 +50,18 @@ export function ttsConfigProblem(): string | null {
   return null;
 }
 
+export function isEnglishNarration(narration: string): boolean {
+  return narration.trim().length >= 40 && detect(narration) === "en";
+}
+
+export function piperModelForNarration(narration: string): string | undefined {
+  if (isEnglishNarration(narration)) {
+    if (config.PIPER_ENGLISH_MODEL) return config.PIPER_ENGLISH_MODEL;
+    if (existsSync(config.DEFAULT_PIPER_ENGLISH_MODEL)) return config.DEFAULT_PIPER_ENGLISH_MODEL;
+  }
+  return config.PIPER_MODEL;
+}
+
 /**
  * Splits the narration into lines, voices each one and writes `<assetsDir>/voice.wav`.
  * Falls back to a silent timeline (reading-speed timings) when TTS is off or fails,
@@ -59,7 +72,8 @@ export async function buildVoiceover(narration: string, assetsDir: string): Prom
   if (config.TTS_PROVIDER === "none" || ttsConfigProblem()) return silentTimeline(texts);
 
   try {
-    const clips = await mapLimit(texts, 3, (t) => synthesize(t));
+    const piperModel = config.TTS_PROVIDER === "piper" ? piperModelForNarration(narration) : undefined;
+    const clips = await mapLimit(texts, 3, (text) => synthesize(text, piperModel));
     const lines: VoiceLine[] = [];
     const parts: Buffer[] = [silence(LEAD_IN_S)];
     let t = LEAD_IN_S;
@@ -89,16 +103,15 @@ function silentTimeline(texts: string[]): Voiceover {
   return { file: null, lines, duration: clampDuration(t + TAIL_S) };
 }
 
-async function synthesize(text: string): Promise<Buffer> {
+async function synthesize(text: string, piperModel?: string): Promise<Buffer> {
   if (config.TTS_PROVIDER === "openai") return openAiSpeech(text);
-  if (config.TTS_PROVIDER === "piper") return piperSpeech(text);
+  if (config.TTS_PROVIDER === "piper") return piperSpeech(text, piperModel!);
   return elevenLabsSpeech(text);
 }
 
 // Piper writes raw 16-bit mono PCM at the voice's own rate (22050 Hz for "medium" voices);
 // FFmpeg resamples it to our 24 kHz.
-async function piperSpeech(text: string): Promise<Buffer> {
-  const model = config.PIPER_MODEL!;
+async function piperSpeech(text: string, model: string): Promise<Buffer> {
   const pcm = await pipeThrough(
     config.PIPER_BIN,
     ["-m", model, "--output-raw", "--length-scale", String(config.PIPER_LENGTH_SCALE)],

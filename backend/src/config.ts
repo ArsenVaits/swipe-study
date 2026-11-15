@@ -72,6 +72,7 @@ const EnvSchema = z.object({
   // Piper: free local TTS (github.com/OHF-Voice/piper1-gpl), run as a separate CLI process.
   PIPER_BIN: z.string().default("piper"),
   PIPER_MODEL: z.string().optional(),
+  PIPER_ENGLISH_MODEL: z.string().optional(),
   // < 1 speaks faster, > 1 slower.
   PIPER_LENGTH_SCALE: z.coerce.number().min(0.5).max(2).default(0.95),
 
@@ -99,5 +100,6 @@ export const config = {
   ...parsed.data,
   HYPERFRAMES_WORK_DIR: path.resolve(parsed.data.HYPERFRAMES_WORK_DIR || path.join(dataDir, "hyperframes")),
   VIDEO_OUTPUT_DIR: path.resolve(parsed.data.VIDEO_OUTPUT_DIR || path.join(dataDir, "videos")),
+  DEFAULT_PIPER_ENGLISH_MODEL: path.join(dataDir, "piper", "en_US-ljspeech-high.onnx"),
 };
 export type Config = typeof config;
