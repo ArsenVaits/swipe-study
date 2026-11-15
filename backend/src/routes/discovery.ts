@@ -4,7 +4,10 @@ import { z } from "zod";
 import { getPublishedVideo, getVideoPublication, listPublishedVideos, setVideoPublication } from "../db.ts";
 import { ApiError } from "../http/errors.ts";
 
-const topics = z.enum(["AI", "DevOps", "Productivity", "Communication", "Design"]);
+const topics = z.enum([
+  "Programming", "Mathematics", "Geography", "AI", "DevOps", "Science",
+  "History", "Languages", "Productivity", "Communication", "Design",
+]);
 const owner = z.object({
   jobId: z.uuid(),
   sessionId: z.string().regex(/^[A-Za-z0-9_-]{8,128}$/),

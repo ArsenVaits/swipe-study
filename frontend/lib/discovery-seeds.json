@@ -70,5 +70,77 @@
     "video": "/discover/design-feedback.mp4",
     "poster": "/discover/design-feedback.webp",
     "description": "Say what happened Point to the affected field. Tell people how to recover."
+  },
+  {
+    "id": "code-functions",
+    "topic": "Programming",
+    "title": "Think in functions",
+    "video": "/discover/code-functions.mp4",
+    "poster": "/discover/code-functions.webp",
+    "description": "Pick one responsibility Give the function clear inputs. Return a useful result."
+  },
+  {
+    "id": "code-debug",
+    "topic": "Programming",
+    "title": "Reproduce a bug",
+    "video": "/discover/code-debug.mp4",
+    "poster": "/discover/code-debug.webp",
+    "description": "Make the bug repeatable Reduce it to a small example. Change one thing at a time."
+  },
+  {
+    "id": "math-percent",
+    "topic": "Mathematics",
+    "title": "Percent change",
+    "video": "/discover/math-percent.mp4",
+    "poster": "/discover/math-percent.webp",
+    "description": "Start with the old value Divide the change by the old value. Multiply the result by 100."
+  },
+  {
+    "id": "math-average",
+    "topic": "Mathematics",
+    "title": "Mean and median",
+    "video": "/discover/math-average.mp4",
+    "poster": "/discover/math-average.webp",
+    "description": "Add, then divide The median is the middle sorted value. Use it to reduce outlier effects."
+  },
+  {
+    "id": "geo-scale",
+    "topic": "Geography",
+    "title": "Read a map scale",
+    "video": "/discover/geo-scale.mp4",
+    "poster": "/discover/geo-scale.webp",
+    "description": "Find the scale bar Compare the map distance to the bar. Check the units."
+  },
+  {
+    "id": "geo-time",
+    "topic": "Geography",
+    "title": "Why time zones exist",
+    "video": "/discover/geo-time.mp4",
+    "poster": "/discover/geo-time.webp",
+    "description": "Earth rotates Different places face the Sun at different times. Time zones standardize local clocks."
+  },
+  {
+    "id": "science-controls",
+    "topic": "Science",
+    "title": "What a control does",
+    "video": "/discover/science-controls.mp4",
+    "poster": "/discover/science-controls.webp",
+    "description": "Keep a comparison Change one condition in the test group. Compare both outcomes."
+  },
+  {
+    "id": "history-sources",
+    "topic": "History",
+    "title": "Read a primary source",
+    "video": "/discover/history-sources.mp4",
+    "poster": "/discover/history-sources.webp",
+    "description": "Start with the author Ask when and why it was made. Compare it with another source."
+  },
+  {
+    "id": "language-recall",
+    "topic": "Languages",
+    "title": "Remember a new word",
+    "video": "/discover/language-recall.mp4",
+    "poster": "/discover/language-recall.webp",
+    "description": "Recall before checking Use the word in a sentence. Review it again later."
   }
 ]

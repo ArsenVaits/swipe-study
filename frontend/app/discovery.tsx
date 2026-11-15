@@ -1,14 +1,26 @@
 'use client'
 
-import { ArrowDown, ArrowUp, Bookmark, Clapperboard, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Atom, Bookmark, Calculator, Clapperboard, Code2, Globe2, Languages, Landmark, Layers3, MessagesSquare, Palette, Search, Server, Sparkles, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import seedVideos from '@/lib/discovery-seeds.json'
 
-export const topics = ['AI', 'DevOps', 'Productivity', 'Communication', 'Design'] as const
+const categories = [
+  { label: 'Programming', keywords: 'code coding development программирование код разработка', icon: Code2, hue: 248 },
+  { label: 'Mathematics', keywords: 'math algebra numbers математика алгебра числа', icon: Calculator, hue: 315 },
+  { label: 'Geography', keywords: 'world maps countries география карты страны', icon: Globe2, hue: 155 },
+  { label: 'AI', keywords: 'artificial intelligence machine learning ии искусственный интеллект', icon: Sparkles, hue: 266 },
+  { label: 'DevOps', keywords: 'ci cd infrastructure deployment девопс инфраструктура деплой', icon: Server, hue: 192 },
+  { label: 'Science', keywords: 'physics experiments наука физика эксперименты', icon: Atom, hue: 219 },
+  { label: 'History', keywords: 'historical sources прошлое история', icon: Landmark, hue: 31 },
+  { label: 'Languages', keywords: 'vocabulary english языки английский', icon: Languages, hue: 331 },
+  { label: 'Productivity', keywords: 'focus time habits продуктивность фокус привычки', icon: Layers3, hue: 49 },
+  { label: 'Communication', keywords: 'feedback teamwork коммуникация общение', icon: MessagesSquare, hue: 283 },
+  { label: 'Design', keywords: 'ui ux visual дизайн интерфейс', icon: Palette, hue: 12 },
+] as const
+export const topics = categories.map(item => item.label)
 type Topic = typeof topics[number]
 type Video = { id: string; title: string; topic: string; video: string; poster?: string; description?: string; publishedAt?: number }
 const bookmarkKey = 'scrolled-discovery-saved'
-const preferenceKey = 'scrolled-discovery-preferences'
 
 function readList<T>(key: string): T[] {
   try {
@@ -22,10 +34,8 @@ function readList<T>(key: string): T[] {
 export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
   const [published, setPublished] = useState<Video[]>([])
   const [bookmarks, setBookmarks] = useState<Video[]>([])
-  const [interests, setInterests] = useState<Topic[]>([])
-  const [topic, setTopic] = useState<Topic | 'For you'>('For you')
+  const [topic, setTopic] = useState<Topic | null>(null)
   const [query, setQuery] = useState('')
-  const [settings, setSettings] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [active, setActive] = useState<Video | null>(null)
   const [playbackError, setPlaybackError] = useState('')
@@ -33,12 +43,18 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const trigger = useRef<HTMLElement | null>(null)
   const playbackRequest = useRef<AbortController | null>(null)
+  const swipeStart = useRef<{ x: number; y: number } | null>(null)
+  const scrollGesture = useRef({ at: -Infinity, direction: 0, distance: 0, consumed: false })
+  const topicHeading = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
     setBookmarks(readList<Video>(bookmarkKey))
-    setInterests(readList<Topic>(preferenceKey))
     return () => playbackRequest.current?.abort()
   }, [])
+
+  useEffect(() => {
+    if (topic) topicHeading.current?.focus()
+  }, [topic])
 
   useEffect(() => {
     if (mode !== 'library') return
@@ -53,26 +69,24 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
     return () => request.abort()
   }, [mode])
 
+  const catalog = useMemo(() => [...published, ...seedVideos], [published])
+  const words = query.toLocaleLowerCase().trim().split(/\s+/)
+  const visibleTopics = categories.filter(item =>
+    words.every(word => (item.label + ' ' + item.keywords).toLocaleLowerCase().includes(word)))
   const items = useMemo(() => {
     if (mode === 'saved') return bookmarks
-    const words = query.toLocaleLowerCase().trim().split(/\s+/)
-    return [...published, ...seedVideos]
-      .filter(item => {
-        const text = [item.title, item.topic, item.description].join(' ').toLocaleLowerCase()
-        return (topic === 'For you' || item.topic === topic) && words.every(word => text.includes(word))
-      })
-      .sort((left, right) =>
-        Number(interests.includes(right.topic as Topic)) - Number(interests.includes(left.topic as Topic)))
-  }, [bookmarks, interests, mode, published, query, topic])
+    if (!topic) return []
+    const terms = query.toLocaleLowerCase().trim().split(/\s+/)
+    return catalog.filter(item => item.topic === topic &&
+      terms.every(term => [item.title, item.description].join(' ').toLocaleLowerCase().includes(term)))
+  }, [bookmarks, catalog, mode, query, topic])
 
   const index = items.findIndex(item => item.id === active?.id)
   const isSaved = active !== null && bookmarks.some(item => item.id === active.id)
 
-  function changeInterest(value: Topic) {
-    const next = interests.includes(value) ? interests.filter(item => item !== value) : [...interests, value]
-    setInterests(next)
-    try { localStorage.setItem(preferenceKey, JSON.stringify(next)) }
-    catch { setNotice('Preferences could not be stored in this browser.') }
+  function selectTopic(value: Topic | null) {
+    setTopic(value)
+    setQuery('')
   }
 
   function toggleBookmark(video: Video) {
@@ -93,7 +107,10 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
     if (button) trigger.current = button
     setActive(video)
     setPlaybackError('')
-    if (!dialog.current.open) dialog.current.showModal()
+    if (!dialog.current.open) {
+      scrollGesture.current = { at: -Infinity, direction: 0, distance: 0, consumed: false }
+      dialog.current.showModal()
+    }
     if (mode !== 'saved' || !video.publishedAt) return
     const request = new AbortController()
     playbackRequest.current = request
@@ -118,30 +135,27 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
     <section aria-label={mode === 'library' ? 'Discover videos' : 'Bookmarked videos'}>
       <span className='sr-only' role='status'>{notice}</span>
       {mode === 'library' && <>
+        {topic && <div className='discovery-topic-header'>
+          <button type='button' className='secondary' onClick={() => selectTopic(null)}><ArrowLeft size={16} /> All topics</button>
+          <h2 ref={topicHeading} tabIndex={-1}>{topic}</h2>
+        </div>}
         <label className='discovery-search'>
           <Search size={20} aria-hidden='true' />
-          <input type='search' placeholder='Search videos and topics' aria-label='Search videos and topics' value={query}
+          <input type='search' placeholder={topic ? 'Search videos in ' + topic : 'Search topics'}
+            aria-label={topic ? 'Search videos' : 'Search topics'} value={query}
             onChange={event => setQuery(event.target.value)} />
         </label>
-        <div className='discovery-filters' aria-label='Video topics'>
-          <button type='button' className='topic-chip' aria-expanded={settings} aria-controls='recommendation-settings'
-            aria-label='Recommendation settings' onClick={() => setSettings(!settings)}>
-            <SlidersHorizontal size={18} />
-          </button>
-          {(['For you', ...topics] as const).map(value => (
-            <button type='button' className='topic-chip' key={value} aria-pressed={topic === value}
-              onClick={() => setTopic(value)}>{value}</button>
-          ))}
-        </div>
-        {settings && <div className='discovery-preferences' id='recommendation-settings'>
-          <strong>Show me more of</strong>
-          <div className='discovery-filters'>
-            {topics.map(value => <button type='button' className='topic-chip' key={value}
-              aria-pressed={interests.includes(value)} onClick={() => changeInterest(value)}>{value}</button>)}
-          </div>
-          <p>Your selected topics appear first in For you.</p>
-        </div>}
-        {loadError && <p role='status'>Community videos are temporarily unavailable.</p>}
+        {!topic && (visibleTopics.length ? <ul className='discovery-grid topic-grid'>
+          {visibleTopics.map(({ label, icon: Icon, hue }) => <li key={label}>
+            <button type='button' className='topic-card' onClick={() => selectTopic(label)}
+              style={{ background: `hsl(${hue} 52% 23%)` }}>
+              <Icon className='topic-card-art' size={88} strokeWidth={1.15} aria-hidden='true' />
+              <ArrowUpRight className='topic-card-arrow' size={16} aria-hidden='true' />
+              <strong>{label}</strong>
+            </button>
+          </li>)}
+        </ul> : <p className='empty-library' role='status'>No topics match your search.</p>)}
+        {topic && loadError && <p role='status'>Community videos are temporarily unavailable.</p>}
       </>}
       {mode === 'saved' && items.length > 0 && <h2 className='saved-section-title'>Bookmarked videos</h2>}
       {items.length ? (
@@ -158,12 +172,31 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
             </li>
           ))}
         </ul>
-      ) : mode === 'library' ? <p className='empty-library' role='status'>No videos match your search.</p> : null}
+      ) : mode === 'library' && topic ? <p className='empty-library' role='status'>No videos match your search.</p> : null}
       <dialog className='discovery-viewer' aria-label='Video player' ref={dialog}
         onClose={() => {
           playbackRequest.current?.abort()
+          swipeStart.current = null
           setActive(null)
           trigger.current?.focus()
+        }}
+        onWheel={event => {
+          if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+          const direction = Math.sign(event.deltaY)
+          const gesture = scrollGesture.current
+          if (event.timeStamp - gesture.at > 140 || direction !== gesture.direction) {
+            gesture.distance = 0
+            gesture.consumed = false
+          }
+          gesture.at = event.timeStamp
+          gesture.direction = direction
+          if (gesture.consumed) return
+          const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1
+          gesture.distance += Math.abs(event.deltaY) * scale
+          if (gesture.distance >= 28) {
+            gesture.consumed = true
+            moveVideo(direction)
+          }
         }}
         onKeyDown={event => {
           if (event.target instanceof HTMLVideoElement) return
@@ -179,16 +212,29 @@ export default function Discovery({ mode }: { mode: 'library' | 'saved' }) {
               active.video ? <video key={active.id} src={active.video} poster={active.poster} autoPlay={!window.matchMedia('(prefers-reduced-motion: reduce)').matches}
                 playsInline muted loop controls aria-label={active.title} onError={() => setPlaybackError('This video could not be played.')} /> :
                 <p role='status'>Loading video…</p>}
+            <div className='viewer-swipe-area' aria-hidden='true'
+              onPointerDown={event => {
+                if (!event.isPrimary || event.button !== 0) return
+                swipeStart.current = { x: event.clientX, y: event.clientY }
+                event.currentTarget.setPointerCapture(event.pointerId)
+              }}
+              onPointerUp={event => {
+                const start = swipeStart.current
+                swipeStart.current = null
+                if (!start) return
+                const distance = start.y - event.clientY
+                if (Math.abs(distance) >= 35 && Math.abs(distance) > Math.abs(start.x - event.clientX)) {
+                  moveVideo(Math.sign(distance))
+                }
+              }}
+              onPointerCancel={() => { swipeStart.current = null }} />
           </div>
           <div className='viewer-details'>
             <div><small>{active.topic}</small><h2>{active.title}</h2></div>
             <button type='button' className='viewer-action' aria-pressed={isSaved} onClick={() => toggleBookmark(active)}>
               <Bookmark size={20} fill={isSaved ? 'currentColor' : 'none'} /> {isSaved ? 'Saved' : 'Save'}
             </button>
-            <div className='viewer-navigation'>
-              <button type='button' className='viewer-action' aria-label='Previous video' disabled={index <= 0} onClick={() => moveVideo(-1)}><ArrowUp size={20} /></button>
-              <button type='button' className='viewer-action' aria-label='Next video' disabled={index < 0 || index >= items.length - 1} onClick={() => moveVideo(1)}><ArrowDown size={20} /></button>
-            </div>
+            {items.length > 1 && index >= 0 && <p className='viewer-position' aria-live='polite'>{index + 1} / {items.length}</p>}
           </div>
         </div>}
       </dialog>
