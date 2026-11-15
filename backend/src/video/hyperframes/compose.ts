@@ -204,6 +204,13 @@ function briefFor(lesson: Lesson, voice: Voiceover, audio: AudioAssets): string 
     "</voice_lines>",
     "",
     `DURATION: ${voice.duration} (the root's data-duration, in seconds)`,
+    ...(() => {
+      const lastEnd = voice.lines[voice.lines.length - 1]?.end ?? 0;
+      const hold = voice.duration - lastEnd;
+      return hold > 3
+        ? [`The voice ends at ${lastEnd.toFixed(1)} s; the last ${hold.toFixed(1)} s are a closing beat: land the idea in one line and hold it, with one calm final move.`]
+        : [];
+    })(),
     `Voice file: ${voice.file ? `assets/${voice.file}` : "none (silent video; still time the scenes to the voice lines)"}`,
     `Music: ${audio.music ?? "none"}`,
     `Sound effects: ${audio.sfx.length ? audio.sfx.join(", ") : "none"}`,

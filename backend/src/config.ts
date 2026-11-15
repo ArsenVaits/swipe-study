@@ -34,6 +34,8 @@ const EnvSchema = z.object({
   HYPERFRAMES_FPS: z.coerce.number().int().min(24).max(60).default(30),
   HYPERFRAMES_QUALITY: z.enum(["draft", "standard", "high"]).default("standard"),
   HYPERFRAMES_MAX_PARALLEL_RENDERS: intFromEnv(1),
+  // Concurrent Opus/Sonnet composition conversations (a lesson series starts several at once).
+  HYPERFRAMES_MAX_PARALLEL_COMPOSE: intFromEnv(3),
   // Chrome capture workers per render. Measured on the 20-core prod server: 6 (auto) 32 s, 12 → 26 s, 16 no gain.
   HYPERFRAMES_RENDER_WORKERS: intFromEnv(12),
   HYPERFRAMES_RENDER_TIMEOUT_MS: intFromEnv(10 * 60 * 1000),
@@ -74,6 +76,13 @@ const EnvSchema = z.object({
   PIPER_LENGTH_SCALE: z.coerce.number().min(0.5).max(2).default(0.95),
 
   MAX_SOURCE_CHARS: intFromEnv(12000),
+  // Lesson series from whole notes or books: the planner picks 1..MAX_LESSONS_PER_SET lessons.
+  MAX_SET_SOURCE_CHARS: intFromEnv(300000),
+  MAX_LESSONS_PER_SET: intFromEnv(10),
+  PLAN_MODEL: z.string().default("claude-haiku-5-5"),
+  // Every video runs between these lengths (narration targets ~40-55 s; short ones get a final hold).
+  VIDEO_MIN_SECONDS: intFromEnv(35),
+  VIDEO_MAX_SECONDS: intFromEnv(60),
   MAX_LESSON_JOBS_PER_SESSION: intFromEnv(20),
   MAX_VIDEO_JOBS_PER_SESSION: intFromEnv(5),
   MAX_VIDEO_JOBS_TOTAL: intFromEnv(50),

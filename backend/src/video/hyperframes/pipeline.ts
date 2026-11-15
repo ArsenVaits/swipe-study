@@ -54,6 +54,7 @@ class Semaphore {
   }
 }
 const renderSlots = new Semaphore(config.HYPERFRAMES_MAX_PARALLEL_RENDERS);
+const composeSlots = new Semaphore(config.HYPERFRAMES_MAX_PARALLEL_COMPOSE);
 
 /** Runs the whole job and returns the path of the finished MP4 in VIDEO_OUTPUT_DIR. */
 export async function runPipeline(
@@ -72,7 +73,7 @@ export async function runPipeline(
   const audio = await copyAudioLibrary(assetsDir, jobId);
 
   await cb.stage("writing");
-  let html = await writeWithOpus(workDir, lesson, voice, audio, cb);
+  let html = await composeSlots.use(() => writeWithOpus(workDir, lesson, voice, audio, cb));
   const usedFallback = html === null;
   if (html === null) html = addFinishingLayer(fallbackComposition(lesson, voice, config.HYPERFRAMES_CAPTIONS), voice.duration);
   await writeFile(path.join(workDir, "index.html"), html);

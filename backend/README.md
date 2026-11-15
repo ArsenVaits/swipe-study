@@ -46,6 +46,16 @@ Errors: `400 VALIDATION_ERROR`, `413 PAYLOAD_TOO_LARGE`, `429 SESSION_LIMIT_REAC
 `422 INSUFFICIENT_SOURCE` (message explains why), `422 LESSON_REFUSED`,
 `502/503 LESSON_GENERATION_FAILED`, `503 AI_NOT_CONFIGURED`.
 
+### `POST /api/lesson-sets` / `GET /api/lesson-sets/:setId`
+
+Whole notes or a book (`sourceText` or `pages: [{page, text}]`, up to `MAX_SET_SOURCE_CHARS`). Returns `202` at once.
+The planner (`src/lessons/plan.ts`, `PLAN_MODEL`) reads numbered paragraphs (`src/lessons/source.ts`) and decides
+how many lessons the material deserves: single-topic notes → 1 (2 at most), a book → its key ideas, up to
+`MAX_LESSONS_PER_SET`. Lessons are then generated in plan order, each focused on its question and told what the
+others cover; every video starts as soon as its lesson exists. `GET` returns the plan titles and the lessons made so
+far (same shape as `GET /api/lesson-jobs/:id`), plus `complete`. A restart marks unfinished series `failed`
+(`INTERRUPTED`), keeping the lessons already made. Videos run `VIDEO_MIN_SECONDS`..`VIDEO_MAX_SECONDS` (35-60 s).
+
 ### `GET /api/lesson-jobs/:jobId`
 
 Same shape as above. Poll every 3–5 s while `status === "rendering_video"`.

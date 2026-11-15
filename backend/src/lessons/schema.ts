@@ -16,6 +16,34 @@ export const createLessonJobBody = (maxSourceChars: number) =>
 
 export type CreateLessonJobBody = z.infer<ReturnType<typeof createLessonJobBody>>;
 
+/** A whole upload (notes or a book), as one text or per page; the server plans 1..N lessons from it. */
+export const createLessonSetBody = (maxChars: number) =>
+  z
+    .object({
+      sourceTitle: z.string().trim().min(1).max(200),
+      sessionId: z
+        .string()
+        .min(8)
+        .max(128)
+        .regex(/^[A-Za-z0-9_-]+$/, "sessionId may contain only letters, digits, '_' and '-'."),
+      sourceText: z.string().max(maxChars).optional(),
+      firstPage: z.number().int().min(1).max(100000).optional(),
+      pages: z
+        .array(z.object({ page: z.number().int().min(1).max(100000), text: z.string().max(maxChars) }))
+        .max(5000)
+        .optional(),
+    })
+    .refine((b) => (b.sourceText?.trim().length ?? 0) > 0 || (b.pages?.length ?? 0) > 0, {
+      message: "Send sourceText or pages.",
+      path: ["sourceText"],
+    })
+    .refine((b) => (b.sourceText?.length ?? 0) + (b.pages ?? []).reduce((n, p) => n + p.text.length, 0) <= maxChars, {
+      message: `The material is longer than ${maxChars} characters.`,
+      path: ["pages"],
+    });
+
+export type CreateLessonSetBody = z.infer<ReturnType<typeof createLessonSetBody>>;
+
 // ---------- What Opus returns (structured output) ----------
 // Kept to plain types: JSON-schema constraints are enforced afterwards by LessonSchema.
 
@@ -48,7 +76,7 @@ export const LessonSchema = z
     title: z.string().trim().min(3).max(90),
     hook: z.string().trim().min(5).max(200),
     explanation: z.string().trim().min(40).max(1500),
-    narration: z.string().trim().min(20).max(900),
+    narration: z.string().trim().min(20).max(1200),
     captions: z.array(z.string().trim().min(1).max(100)).min(2).max(8),
     scenePrompt: z.string().trim().min(15).max(600),
     quiz: z.object({

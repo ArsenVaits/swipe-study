@@ -134,6 +134,24 @@ test("missing AI configuration fails safely without contacting a provider", asyn
   assert.equal((await response.json()).error.code, "AI_NOT_CONFIGURED");
 });
 
+test("lesson sets validate input, need AI configuration and 404 unknown ids", async () => {
+  const post = (body) => fetch(origin + "/api/lesson-sets", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const invalid = await post({ sourceTitle: "Book", sessionId: "test-session" });
+  assert.equal(invalid.status, 400);
+  assert.equal((await invalid.json()).error.code, "VALIDATION_ERROR");
+  const noKey = await post({
+    sourceTitle: "Book", sessionId: "test-session",
+    pages: [{ page: 1, text: "Kafka keeps events in an append-only log that many services read. ".repeat(10) }],
+  });
+  assert.equal(noKey.status, 503);
+  assert.equal((await noKey.json()).error.code, "AI_NOT_CONFIGURED");
+  const missing = await fetch(origin + "/api/lesson-sets/00000000-0000-4000-8000-000000000009");
+  assert.equal(missing.status, 404);
+  assert.equal((await missing.json()).error.code, "NOT_FOUND");
+});
+
 test("bundled demo assets remain accessible", async () => {
   const response = await fetch(origin + "/demo/lesson.mp4", { method: "HEAD" });
   assert.equal(response.status, 200);
