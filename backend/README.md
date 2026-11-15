@@ -56,6 +56,20 @@ others cover; every video starts as soon as its lesson exists. `GET` returns the
 far (same shape as `GET /api/lesson-jobs/:id`), plus `complete`. A restart marks unfinished series `failed`
 (`INTERRUPTED`), keeping the lessons already made. Videos run `VIDEO_MIN_SECONDS`..`VIDEO_MAX_SECONDS` (35-60 s).
 
+### `GET /api/tracks` / `GET /api/catalog?track=…`
+
+A ready-made catalog: 220 hand-written lessons (11 topic tracks × 20, `src/catalog/tracks.ts`) with pre-rendered
+35-60 s videos, the same for every visitor. `track` takes one or several track ids; see `docs/FRONTEND_API.md` §3.5.
+
+Building it uses no model: the lessons are in `catalog/<track>.json`, the voice is the server's TTS (Piper) and the
+picture is one of six hand-made HyperFrames templates (`scripts/catalog/templates.ts`).
+
+```bash
+node scripts/catalog/check.ts                                                # validate the content
+node --env-file=<tts env> scripts/catalog/build.ts --out <dir> [--track ai]   # render <dir>/<id>.mp4 + <id>.json
+node --env-file=<backend env> scripts/catalog/import.ts <dir>                 # copy to videos/catalog/, upsert into SQLite
+```
+
 ### `GET /api/lesson-jobs/:jobId`
 
 Same shape as above. Poll every 3–5 s while `status === "rendering_video"`.

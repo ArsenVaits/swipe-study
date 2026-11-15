@@ -173,7 +173,48 @@ GET /api/lesson-jobs/:jobId  каждые 3–5 с
 
 Фронт вызывает этот маршрут при загрузке страницы и восстанавливает ленту.
 
-### 3.5. `GET /api/health` — проверка сервера
+### 3.5. Готовый каталог по трекам: `GET /api/tracks` и `GET /api/catalog`
+
+Готовые уроки с видео, одинаковые для всех посетителей: 11 треков по 20 уроков, ролики от 35 до 60 секунд. Каталог нужен, чтобы лента была заполнена ещё до загрузки PDF. Идентификатор трека (`track`) — то, по чему фронт фильтрует.
+
+`GET /api/tracks` — список треков и число уроков в каждом:
+
+```json
+{ "tracks": [{ "id": "programming", "title": "Programming", "titleRu": "Программирование", "color": "#4ade80", "count": 20 }, …] }
+```
+
+| `id` | Трек |
+|---|---|
+| `programming` | Programming |
+| `mathematics` | Mathematics |
+| `geography` | Geography |
+| `ai` | AI |
+| `devops` | DevOps |
+| `science` | Science |
+| `history` | History |
+| `languages` | Languages |
+| `productivity` | Productivity |
+| `communication` | Communication |
+| `design` | Design |
+
+`GET /api/catalog?track=ai,devops&limit=20&offset=0` — уроки выбранных треков:
+
+- `track` — один id или несколько через запятую. Без параметра приходят все треки.
+- `limit` — от 1 до 100, по умолчанию 20; `offset` — для подгрузки следующей страницы.
+- Один трек приходит в порядке уроков. Несколько треков перемешаны: первый урок каждого трека, затем второй урок каждого, и так далее.
+- Неизвестный трек → `400 VALIDATION_ERROR`.
+
+```json
+{
+  "lessons": [{ "jobId": "ai-01", "status": "ready", "lesson": { … }, "videoUrl": "/api/media/catalog/ai-01.mp4", "error": null,
+                "track": "ai", "trackTitle": "AI", "position": 1, "durationSeconds": 41.2 }],
+  "total": 40, "limit": 20, "offset": 0
+}
+```
+
+Поля `jobId`, `status`, `lesson`, `videoUrl`, `error` такие же, как у `GET /api/lesson-jobs/:id`, поэтому карточку ленты можно рисовать одним компонентом. Опрашивать каталог не нужно: всё уже `ready`.
+
+### 3.6. `GET /api/health` — проверка сервера
 
 ```json
 { "ok": true, "videoProvider": "mock", "lessonAi": "configured", "tts": "none" }

@@ -272,3 +272,66 @@ export function openSetIdsForSession(sessionId: string): string[] {
       .all(sessionId) as Row[]
   ).map((r) => r.id as string);
 }
+
+// ---------- Ready-made catalog (hand-written lessons with pre-rendered videos, grouped by track) ----------
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS catalog_lessons (
+    id               TEXT PRIMARY KEY,
+    track            TEXT NOT NULL,
+    track_rank       INTEGER NOT NULL,
+    position         INTEGER NOT NULL,
+    lesson_json      TEXT NOT NULL,
+    video_url        TEXT NOT NULL,
+    duration_seconds REAL NOT NULL,
+    created_at       INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_catalog_track ON catalog_lessons(track, position);
+  CREATE INDEX IF NOT EXISTS idx_catalog_feed ON catalog_lessons(position, track_rank);
+`);
+
+export interface CatalogRecord {
+  id: string;
+  track: string;
+  position: number;
+  lesson: Lesson;
+  videoUrl: string;
+  durationSeconds: number;
+}
+
+export function upsertCatalogLesson(r: CatalogRecord & { trackRank: number }): void {
+  db.prepare(
+    `INSERT INTO catalog_lessons (id, track, track_rank, position, lesson_json, video_url, duration_seconds, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET track = excluded.track, track_rank = excluded.track_rank, position = excluded.position,
+       lesson_json = excluded.lesson_json, video_url = excluded.video_url, duration_seconds = excluded.duration_seconds`,
+  ).run(r.id, r.track, r.trackRank, r.position, JSON.stringify(r.lesson), r.videoUrl, r.durationSeconds, Date.now());
+}
+
+/**
+ * Catalog lessons, optionally limited to some tracks. One track: in lesson order.
+ * Several or all tracks: interleaved (lesson 1 of every track, then lesson 2, …) so the feed mixes topics.
+ */
+export function listCatalog(tracks: string[], limit: number, offset: number): { items: CatalogRecord[]; total: number } {
+  const where = tracks.length ? `WHERE track IN (${tracks.map(() => "?").join(", ")})` : "";
+  const rows = db
+    .prepare(`SELECT * FROM catalog_lessons ${where} ORDER BY position, track_rank LIMIT ? OFFSET ?`)
+    .all(...tracks, limit, offset) as Row[];
+  const total = (db.prepare(`SELECT COUNT(*) AS n FROM catalog_lessons ${where}`).get(...tracks) as Row).n as number;
+  return {
+    items: rows.map((r) => ({
+      id: r.id as string,
+      track: r.track as string,
+      position: r.position as number,
+      lesson: JSON.parse(r.lesson_json as string) as Lesson,
+      videoUrl: r.video_url as string,
+      durationSeconds: r.duration_seconds as number,
+    })),
+    total,
+  };
+}
+
+export function catalogCounts(): Map<string, number> {
+  const rows = db.prepare("SELECT track, COUNT(*) AS n FROM catalog_lessons GROUP BY track").all() as Row[];
+  return new Map(rows.map((r) => [r.track as string, r.n as number]));
+}

@@ -8,6 +8,7 @@ import { failInterruptedSets } from "./db.ts";
 import { lessonJobsRouter } from "./routes/lessonJobs.ts";
 import { lessonSetsRouter } from "./routes/lessonSets.ts";
 import { lessonsRouter } from "./routes/lessons.ts";
+import { catalogRouter, tracksRouter } from "./routes/catalog.ts";
 import { ttsProviderName } from "./tts/index.ts";
 import { MEDIA_URL_PREFIX } from "./video/hyperframes/provider.ts";
 import { videoConfigWarnings, videoProvider } from "./video/index.ts";
@@ -56,7 +57,9 @@ app.get("/api/deployment", (_req, res) => {
 });
 app.use("/api/lesson-jobs", lessonJobsRouter);
 app.use("/api/lessons", lessonsRouter);
-// Finished HyperFrames videos (<db dir>/videos/<jobId>.mp4). Range requests are supported for seeking.
+app.use("/api/tracks", tracksRouter);
+app.use("/api/catalog", catalogRouter);
+// Finished HyperFrames videos (<db dir>/videos/<jobId>.mp4, catalog videos in videos/catalog/<id>.mp4). Range requests are supported for seeking.
 app.use(
   MEDIA_URL_PREFIX,
   express.static(path.resolve(config.VIDEO_OUTPUT_DIR), { index: false, immutable: true, maxAge: "7d", dotfiles: "deny" }),

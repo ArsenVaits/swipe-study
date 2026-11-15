@@ -79,6 +79,11 @@ before(async () => {
       (id, session_id, status, source_title, source_page, source_chars, video_url, created_at, updated_at)
       VALUES (?, 'test-session', 'ready', 'Existing lesson', 1, 100, '/demo/lesson.mp4', 1, 1)`)
       .run(jobId);
+    const insert = db.prepare(`INSERT INTO catalog_lessons
+      (id, track, track_rank, position, lesson_json, video_url, duration_seconds, created_at) VALUES (?, ?, ?, ?, ?, ?, 40, 1)`);
+    for (const [id, track, rank, position] of [["programming-01", "programming", 0, 1], ["programming-02", "programming", 0, 2], ["ai-01", "ai", 3, 1]]) {
+      insert.run(id, track, rank, position, JSON.stringify({ title: id }), `/api/media/catalog/${id}.mp4`);
+    }
   } finally { db.close(); }
 });
 
@@ -160,6 +165,28 @@ test("a session's lessons can be listed to rebuild the feed after a reload", asy
   assert.deepEqual(body.sets, []);
   assert.equal((await (await fetch(origin + "/api/lessons?sessionId=someone-else")).json()).lessons.length, 0);
   assert.equal((await fetch(origin + "/api/lessons")).status, 400);
+});
+
+test("catalog lessons can be listed and filtered by track", async () => {
+  const tracks = (await (await fetch(origin + "/api/tracks")).json()).tracks;
+  assert.equal(tracks.length, 11);
+  assert.equal(tracks.find((t) => t.id === "programming").count, 2);
+  assert.equal(tracks.find((t) => t.id === "design").count, 0);
+
+  const all = await (await fetch(origin + "/api/catalog")).json();
+  assert.equal(all.total, 3);
+  assert.deepEqual(all.lessons.map((l) => l.jobId), ["programming-01", "ai-01", "programming-02"]);
+  assert.equal(all.lessons[0].status, "ready");
+  assert.equal(all.lessons[0].videoUrl, "/api/media/catalog/programming-01.mp4");
+
+  const ai = await (await fetch(origin + "/api/catalog?track=ai")).json();
+  assert.deepEqual(ai.lessons.map((l) => [l.jobId, l.track]), [["ai-01", "ai"]]);
+  const page = await (await fetch(origin + "/api/catalog?track=programming,ai&limit=1&offset=1")).json();
+  assert.deepEqual([page.total, page.lessons[0].jobId], [3, "ai-01"]);
+
+  const bad = await fetch(origin + "/api/catalog?track=cooking");
+  assert.equal(bad.status, 400);
+  assert.equal((await bad.json()).error.code, "VALIDATION_ERROR");
 });
 
 test("bundled demo assets remain accessible", async () => {
