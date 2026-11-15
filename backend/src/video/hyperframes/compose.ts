@@ -11,6 +11,8 @@ const client = new Anthropic({ timeout: 10 * 60_000, maxRetries: 1 });
 
 export class ComposeError extends Error {}
 
+type Effort = "low" | "medium" | "high";
+
 export interface AudioAssets {
   /** Paths relative to the project, e.g. "assets/music/bed.mp3". */
   music: string | null;
@@ -37,7 +39,7 @@ export class CompositionWriter {
         problems.map((p) => `- ${p}`).join("\n") +
         "\n\nFix all of them and reply with the complete corrected HTML document only.",
     });
-    return this.ask();
+    return this.ask({ effort: config.HYPERFRAMES_FIX_EFFORT });
   }
 
   /**
@@ -65,13 +67,13 @@ export class CompositionWriter {
       content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: f.data } });
     }
     this.messages.push({ role: "user", content });
-    const reply = await this.ask({ allowNoHtml: true });
+    const reply = await this.ask({ allowNoHtml: true, effort: config.HYPERFRAMES_FIX_EFFORT });
     return reply;
   }
 
-  private async ask(opts: { allowNoHtml: true }): Promise<string | null>;
-  private async ask(opts?: { allowNoHtml?: false }): Promise<string>;
-  private async ask(opts: { allowNoHtml?: boolean } = {}): Promise<string | null> {
+  private async ask(opts: { allowNoHtml: true; effort?: Effort }): Promise<string | null>;
+  private async ask(opts?: { allowNoHtml?: false; effort?: Effort }): Promise<string>;
+  private async ask(opts: { allowNoHtml?: boolean; effort?: Effort } = {}): Promise<string | null> {
     let response: Anthropic.Beta.BetaMessage;
     try {
       // Streaming: a full composition is a long output, and streaming avoids HTTP timeouts.
@@ -81,7 +83,7 @@ export class CompositionWriter {
           max_tokens: 32000,
           system: [{ type: "text", text: composeSystemPrompt(config.HYPERFRAMES_CAPTIONS), cache_control: { type: "ephemeral" } }],
           messages: this.messages,
-          output_config: { effort: config.HYPERFRAMES_EFFORT },
+          output_config: { effort: opts.effort ?? config.HYPERFRAMES_EFFORT },
           betas: ["server-side-fallback-2026-07-01"],
           fallbacks: "default",
         })
