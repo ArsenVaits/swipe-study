@@ -1,0 +1,58 @@
+# Production vhost; certificate covers both the new and previous domains.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name 89.126.195.129 127.0.0.1 localhost;
+    client_max_body_size 20m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 180s;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name swipestudy.duckdns.org scrolled.duckdns.org;
+    return 308 https://swipestudy.duckdns.org$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name scrolled.duckdns.org;
+    ssl_certificate /etc/letsencrypt/live/scrolled.duckdns.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/scrolled.duckdns.org/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    return 308 https://swipestudy.duckdns.org$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name swipestudy.duckdns.org;
+    client_max_body_size 20m;
+    ssl_certificate /etc/letsencrypt/live/scrolled.duckdns.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/scrolled.duckdns.org/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 180s;
+    }
+}

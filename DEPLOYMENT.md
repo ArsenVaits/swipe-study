@@ -32,6 +32,21 @@ Production has unpacked application source and compiled output, not a complete G
 
 The workflows preserve Nginx, systemd units, the gateway, WireGuard, NAT, SSH forwarding, persistent data, and all original releases. A dedicated SSH key uses the existing unprivileged application account. A separate Unix deployment account would require changing access to the existing application directory and symlink; this setup instead limits passwordless privilege to exact frontend and backend service restarts.
 
+## Public domain
+
+The canonical public origin is `https://swipestudy.duckdns.org`. Public deployment checks use HTTPS and validate the certificate for this hostname. SSH continues to use the existing IP address and forwarded port.
+
+The migration was applied and publicly verified on 2026-11-15: DNS resolves to `89.126.195.129`, the homepage returns HTTP 200 with a valid TLS certificate, and `/api/health` reports `ok: true`. The old HTTPS domain and the new HTTP domain return HTTP 308 to the new HTTPS origin while preserving paths and query strings. Nginx, frontend, backend, and the Certbot renewal timer are active. Certificate renewal includes an Nginx reload hook.
+
+The one-time migration uses `scripts/deploy/change-domain.sh` with `scripts/deploy/nginx.conf.example` alongside it. Both are staged in `/home/arsenvaits/.config/scrolled/`. To reapply the configuration as an administrator, run:
+
+```sh
+ssh -t -p 2222 arsenvaits@89.126.195.129 \
+  'sudo bash /home/arsenvaits/.config/scrolled/change-domain.sh'
+```
+
+The script backs up the current Nginx vhost, expands the existing certificate to cover both domain names, installs and validates the new vhost, reloads Nginx, and checks frontend/API health over HTTPS. On failure it restores the previous vhost. After application, HTTP on both names and HTTPS on `scrolled.duckdns.org` redirect to `https://swipestudy.duckdns.org`, preserving paths and query strings. IP and loopback HTTP checks remain available. The existing Certbot account and certificate lineage stay in use, with an Nginx reload hook for renewal.
+
 ## Automatic deployment
 
 Every push to `main`, including documentation-only pushes, runs both `.github/workflows/deploy.yml` (**Deploy frontend**) and `.github/workflows/deploy-backend.yml` (**Deploy backend**). Each also supports manual runs on `main`. They use separate concurrency groups and server locks, so one component cannot cancel the other's pending run. The workflows deploy independently; a failure in one does not undo a successful deployment of the other.
@@ -57,7 +72,7 @@ Workflow concurrency queues production runs without cancelling an active deploym
 3. Load the separate backend deployment configuration. Check the exact service, working directory, runtime, NOPASSWD restart rule, environment-file path, existing absolute database path, and current `/api/health`. Reinstall locked dependencies and repeat type checking and isolated API tests using the service's actual Node runtime before switching.
 4. Create a consistent SQLite online backup in `backend-deploy/backups/<release-id>.sqlite3` with mode 600, using SQLite's backup API while the original service continues handling requests. Verify database integrity. This includes committed WAL data; do not use a raw copy of a live `.db` file.
 5. Write `.deployment-revision` in the new release, preserve `backend-deploy/previous`, atomically switch only `backend-current`, and restart only `scrolled-backend.service`. The unchanged unit continues reading the existing `backend.env`, including the absolute persistent database path. Environment files and production data are never copied into or replaced by a release.
-6. Verify the service, HTTP 200 and `{ "ok": true }` at `http://127.0.0.1:3001/api/health`, and the exact identity at `/api/deployment`. Repeat health and revision checks through `http://89.126.195.129/api/...`, exercising the existing Nginx → Next.js → backend route. `/api/health` also reports the running `revision`.
+6. Verify the service, HTTP 200 and `{ "ok": true }` at `http://127.0.0.1:3001/api/health`, and the exact identity at `/api/deployment`. Repeat health and revision checks through `https://swipestudy.duckdns.org/api/...`, exercising the existing Nginx → Next.js → backend route. `/api/health` also reports the running `revision`.
 
 Failures restore the previous backend code and recheck health. Public-check rollback is guarded against undoing a newer release. Rollback never restores the database automatically, because that could discard requests completed after the snapshot. Database schema changes must remain compatible with the previous application release; destructive migrations require a separately reviewed migration/restore plan. The current backend uses additive `CREATE TABLE/INDEX IF NOT EXISTS` initialization and this deployment adds no migration.
 
@@ -140,10 +155,10 @@ curl -f http://127.0.0.1:3001/api/deployment
 Public verification:
 
 ```sh
-curl -f http://89.126.195.129/
-curl -f "http://89.126.195.129/__deployment.txt?check=$(date +%s)"
-curl -f http://89.126.195.129/api/health
-curl -f "http://89.126.195.129/api/deployment?check=$(date +%s)"
+curl -f https://swipestudy.duckdns.org/
+curl -f "https://swipestudy.duckdns.org/__deployment.txt?check=$(date +%s)"
+curl -f https://swipestudy.duckdns.org/api/health
+curl -f "https://swipestudy.duckdns.org/api/deployment?check=$(date +%s)"
 ```
 
 The marker contains public commit/release identifiers only. The legacy baseline has no marker; its fallback rollback check uses service state and HTTP 200.

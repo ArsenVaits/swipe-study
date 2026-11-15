@@ -33,6 +33,8 @@ npm run dev
 
 Open http://localhost:3000. The frontend proxies `/api` and `/demo` to the backend.
 
+Production domain: https://swipestudy.duckdns.org. See [DEPLOYMENT.md](DEPLOYMENT.md) for server setup.
+
 Details: [backend/README.md](backend/README.md), [frontend/README.md](frontend/README.md), [docs/FRONTEND_API.md](docs/FRONTEND_API.md).
 
 ## Contributors

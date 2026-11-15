@@ -4,6 +4,7 @@ umask 077
 component=${1:-frontend}
 [[ $component == frontend || $component == backend ]] || { echo 'Use frontend or backend' >&2; exit 1; }
 remote_component=''
+public_origin='https://swipestudy.duckdns.org'
 health_path=/
 revision_path=/__deployment.txt
 if [[ $component == backend ]]; then
@@ -67,13 +68,13 @@ ssh "${ssh_opts[@]}" "$target" \
 public_ok=0
 for attempt in {1..12}; do
   body=$(curl --silent --show-error --fail --connect-timeout 5 --max-time 10 \
-    "http://89.126.195.129$revision_path?release=$release&attempt=$attempt") || body=''
+    "$public_origin$revision_path?release=$release&attempt=$attempt") || body=''
   if [[ $body == "$GITHUB_SHA $release" ]] && \
       [[ $(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-        --connect-timeout 5 --max-time 10 "http://89.126.195.129$health_path") == 200 ]]; then
+        --connect-timeout 5 --max-time 10 "$public_origin$health_path") == 200 ]]; then
     if [[ $component == frontend ]] || \
         curl --silent --show-error --fail --connect-timeout 5 --max-time 10 \
-          "http://89.126.195.129$health_path" | \
+          "$public_origin$health_path" | \
           python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ok") is True else 1)'; then
       public_ok=1; break
     fi
