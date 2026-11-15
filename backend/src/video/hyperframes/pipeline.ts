@@ -150,7 +150,14 @@ async function writeWithOpus(
       await cb.stage("writing");
       // Faults first, then a few warnings as context.
       const warnings = problems.filter((p) => !faults.includes(p)).slice(0, 6);
-      draft = clean(await writer.fix([...faults, ...warnings]));
+      const fixed = await writer.fix([...faults, ...warnings]);
+      if (fixed === null) {
+        // Nothing applicable came back: keep the checked draft unless it is actually broken.
+        if (result.blocking > 0) return null;
+        html = draft.html;
+        break;
+      }
+      draft = clean(fixed);
     }
   } catch (err) {
     if (err instanceof ComposeError) console.warn("[hyperframes] composition step failed:", err.message);
