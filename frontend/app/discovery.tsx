@@ -109,7 +109,12 @@ export default function Discovery({
     const video = strip.current?.querySelector<HTMLVideoElement>('[data-active] video')
     if (!video) return
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      void video.play().catch(() => undefined)
+      // Sound is on by default; if the browser blocks autoplay with sound, start muted instead.
+      video.muted = false
+      void video.play().catch(() => {
+        video.muted = true
+        return video.play()
+      }).catch(() => undefined)
     }
     return () => video.pause()
   }, [active?.id, active?.video])
@@ -263,7 +268,7 @@ export default function Discovery({
                 <div className='viewer-slide' key={item.id} data-active={selected || undefined}
                   inert={!selected}>
                   {nearby ? <video src={item.video} poster={item.poster}
-                    playsInline muted loop controls={selected} preload={selected ? 'auto' : 'metadata'}
+                    playsInline loop controls={selected} preload={selected ? 'auto' : 'metadata'}
                     aria-label={item.title} /> : <img src={item.poster} alt='' />}
                 </div>
               )
